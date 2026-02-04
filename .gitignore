@@ -1,0 +1,49 @@
+# Claude AI context files
+CLAUDE.md
+.claude/
+**/CLAUDE.md
+
+# Documentation (planning/internal)
+docs/
+
+# Base directory (old/reference code)
+base-dir/
+
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+out/
+
+# Next.js (handled in subdirectory but also here for safety)
+.next/
+.vercel/
+
+# TypeScript
+*.tsbuildinfo
+
+# Test coverage
+coverage/
