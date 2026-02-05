@@ -6,6 +6,10 @@ CLAUDE.md
 # Documentation (planning/internal)
 docs/
 
+# Resources (SDK documentation/internal)
+resources/
+demo-wireframe/
+
 # Base directory (old/reference code)
 base-dir/
 
