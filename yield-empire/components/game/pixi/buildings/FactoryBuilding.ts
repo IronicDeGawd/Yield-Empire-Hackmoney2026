@@ -62,10 +62,4 @@ export function drawFactoryBuilding(
     0x4b5563 // left
   );
 
-  // Smoke puff (static, animation handled elsewhere)
-  g.circle(chimX, chimTopY - 12, 6);
-  g.fill({ color: 0x9ca3af, alpha: 0.5 });
-
-  g.circle(chimX - 4, chimTopY - 20, 4);
-  g.fill({ color: 0x9ca3af, alpha: 0.3 });
 }
