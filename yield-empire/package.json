@@ -10,9 +10,19 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ensdomains/content-hash": "^3.0.0",
+    "@erc7824/nitrolite": "^0.5.3",
+    "@pixi/react": "^8.0.5",
+    "@rainbow-me/rainbowkit": "^2.2.10",
+    "@tanstack/react-query": "^5.90.20",
+    "framer-motion": "^12.31.0",
+    "lucide-react": "^0.563.0",
     "next": "16.1.6",
+    "pixi.js": "^8.16.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "viem": "^2.45.1",
+    "wagmi": "^3.4.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
