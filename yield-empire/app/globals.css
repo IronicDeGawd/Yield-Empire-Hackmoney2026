@@ -48,6 +48,7 @@ html {
   padding: 0;
   height: 100%;
   overflow: hidden;
+  color-scheme: dark;
 }
 
 body {
@@ -101,7 +102,7 @@ body > div {
   border-bottom: 4px solid #b8860b;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, border-bottom-width 0.15s ease, transform 0.15s ease;
 }
 
 .btn-gold:hover {
@@ -145,6 +146,12 @@ body > div {
 
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float {
+    animation: none;
+  }
 }
 
 /* Glow effect for interactive elements */

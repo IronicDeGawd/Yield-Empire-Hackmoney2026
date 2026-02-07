@@ -93,6 +93,27 @@ export interface BuildingConfig {
   description: string;
 }
 
+// Result of a single protocol settlement transaction
+export interface SettlementTx {
+  protocol: ProtocolId;
+  protocolName: string;
+  chain: string; // 'Sepolia' | 'Base Sepolia'
+  chainId: number;
+  amount: bigint; // USDC amount in 6-decimal units
+  hash: string; // Transaction hash
+  status: 'pending' | 'confirmed' | 'failed';
+  error?: string;
+}
+
+// Complete settlement result from closing a Yellow Network session
+export interface SettlementResult {
+  sessionId: string;
+  actionCount: number;
+  gasSaved: number;
+  transactions: SettlementTx[];
+  timestamp: number;
+}
+
 // Quest for guild cooperation
 export interface Quest {
   id: string;
