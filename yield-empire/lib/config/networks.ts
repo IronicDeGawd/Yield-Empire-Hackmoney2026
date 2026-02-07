@@ -46,4 +46,5 @@ export const YELLOW_CONTRACTS = {
 export const GAME_PROTOCOL = 'yield-empire-v1';
 
 // Challenge period for state channel disputes (in seconds)
-export const CHALLENGE_PERIOD = 86400; // 24 hours
+// App sessions use 0 (no on-chain dispute) per Nitrolite docs
+export const CHALLENGE_PERIOD = 0;

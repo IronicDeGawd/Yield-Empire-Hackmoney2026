@@ -64,6 +64,7 @@ export class YellowSessionManager {
   private appSessionId: Hex | null = null;
   private stateVersion: number = 0;
   private actionCount: number = 0;
+  private gasSavedTotal: number = 0;
   private initialUsdcAmount: string = '100000000';
   private jwtToken: string | null = null;
   private brokerAddress: Address | null = null;
@@ -171,7 +172,7 @@ export class YellowSessionManager {
           participants: [userAddress, this.brokerAddress],
           weights: [100, 0],
           quorum: 100,
-          challenge: CHALLENGE_PERIOD, // Use configured challenge period, not 0
+          challenge: CHALLENGE_PERIOD,
           nonce: Date.now(),
         },
         allocations,
@@ -229,6 +230,7 @@ export class YellowSessionManager {
     // Only increment after successful confirmation
     this.stateVersion = nextVersion;
     this.actionCount++;
+    this.gasSavedTotal += this.getActionGasCost(action);
     this.emitState();
   }
 
@@ -275,7 +277,7 @@ export class YellowSessionManager {
       isSessionActive: this.isSessionActive,
       sessionId: this.appSessionId ?? undefined,
       actionCount: this.actionCount,
-      gasSaved: this.calculateGasSaved(),
+      gasSaved: this.gasSavedTotal,
     };
   }
 
@@ -486,12 +488,17 @@ export class YellowSessionManager {
   }
 
   /**
-   * Private: Calculate gas saved based on action count
+   * Private: Get gas cost for a specific action type
    */
-  private calculateGasSaved(): number {
-    // Simple calculation - average gas cost per action
-    const avgGasCost = 0.4; // USD
-    return this.actionCount * avgGasCost;
+  private getActionGasCost(action: GameAction): number {
+    switch (action.type) {
+      case 'DEPOSIT_TO_PROTOCOL': return GAS_COSTS.deposit;
+      case 'COMPOUND_YIELD': return GAS_COSTS.compound;
+      case 'UPGRADE_BUILDING': return GAS_COSTS.upgrade;
+      case 'CONTRIBUTE_TO_GUILD': return GAS_COSTS.guildContribute;
+      case 'CLAIM_REWARDS': return GAS_COSTS.claim;
+      default: return 0.4;
+    }
   }
 
   /**
