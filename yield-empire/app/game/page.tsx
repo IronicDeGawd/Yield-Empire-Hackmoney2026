@@ -9,10 +9,11 @@ import { useState, useEffect } from 'react';
 import { PixiIsometricMap } from '@/components/game/PixiIsometricMap';
 import { GameUI } from '@/components/game/GameUI';
 import { INITIAL_ENTITIES, INITIAL_CONNECTIONS } from '@/lib/constants';
-import { GameEntity, PlayerProfile, SessionState } from '@/lib/types';
+import { GameEntity, PlayerProfile } from '@/lib/types';
 import { useAccount } from 'wagmi';
 import { useEnsName, useEnsAvatar } from 'wagmi';
 import { STAR_DATA, CLOUD_DATA } from '@/components/game/pixi/effects/Starfield';
+import { useYellowSession } from '@/hooks/useYellowSession';
 
 export default function GamePage() {
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
@@ -24,13 +25,8 @@ export default function GamePage() {
   const { data: ensName } = useEnsName({ address });
   const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
 
-  // Mock session state (will be replaced with Yellow Network hook)
-  const [sessionState, setSessionState] = useState<SessionState>({
-    isConnected: false,
-    isSessionActive: false,
-    actionCount: 0,
-    gasSaved: 0,
-  });
+  // Yellow Network session
+  const yellowSession = useYellowSession();
 
   // Player profile (will be replaced with ENS integration)
   const player: PlayerProfile | undefined =
@@ -59,51 +55,77 @@ export default function GamePage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Simulate Yellow Network session on wallet connect
+  // Auto-connect to Yellow Network when wallet connects
   useEffect(() => {
-    if (isConnected) {
-      setSessionState({
-        isConnected: true,
-        isSessionActive: true,
-        actionCount: 237,
-        gasSaved: 47.4,
-      });
-    } else {
-      setSessionState({
-        isConnected: false,
-        isSessionActive: false,
-        actionCount: 0,
-        gasSaved: 0,
+    if (isConnected && !yellowSession.isConnected && !yellowSession.isConnecting) {
+      yellowSession.connect().catch((err) => {
+        console.error('Failed to connect to Yellow Network:', err);
       });
     }
-  }, [isConnected]);
+  }, [isConnected, yellowSession]);
+
+  // Auto-create session after Yellow Network connects
+  useEffect(() => {
+    if (
+      yellowSession.isConnected &&
+      !yellowSession.isSessionActive &&
+      !yellowSession.isConnecting
+    ) {
+      yellowSession.createSession().catch((err) => {
+        console.error('Failed to create Yellow Network session:', err);
+      });
+    }
+  }, [yellowSession.isConnected, yellowSession.isSessionActive, yellowSession]);
 
   // Handle building upgrade
-  const handleUpgrade = (entityId: string) => {
+  const handleUpgrade = async (entityId: string) => {
+    // Optimistically update UI
     setEntities((prev) =>
       prev.map((e) => (e.id === entityId ? { ...e, level: e.level + 1 } : e))
     );
-    setSessionState((prev) => ({
-      ...prev,
-      actionCount: prev.actionCount + 1,
-      gasSaved: prev.gasSaved + 0.4,
-    }));
+
+    // Submit action to Yellow Network
+    try {
+      await yellowSession.performAction(
+        { type: 'UPGRADE_BUILDING', buildingId: entityId },
+        { entities, timestamp: Date.now() }
+      );
+    } catch (err) {
+      console.error('Failed to submit upgrade action:', err);
+      // Revert optimistic update on error
+      setEntities((prev) =>
+        prev.map((e) => (e.id === entityId ? { ...e, level: e.level - 1 } : e))
+      );
+    }
   };
 
   // Handle compound all
-  const handleCompoundAll = () => {
-    setSessionState((prev) => ({
-      ...prev,
-      actionCount: prev.actionCount + 1,
-      gasSaved: prev.gasSaved + 0.3,
-    }));
+  const handleCompoundAll = async () => {
+    try {
+      await yellowSession.performAction(
+        { type: 'COMPOUND_YIELD' },
+        { entities, timestamp: Date.now() }
+      );
+    } catch (err) {
+      console.error('Failed to submit compound action:', err);
+    }
   };
 
   // Handle settlement
-  const handleSettle = () => {
-    alert(
-      `Settling ${sessionState.actionCount} actions!\nEstimated gas saved: $${sessionState.gasSaved.toFixed(2)}`
+  const handleSettle = async () => {
+    const confirmed = confirm(
+      `Settle ${yellowSession.actionCount} actions?\nEstimated gas saved: $${yellowSession.gasSaved.toFixed(2)}`
     );
+
+    if (confirmed) {
+      try {
+        await yellowSession.settleSession();
+        alert('Settlement complete! Actions batched into on-chain transactions.');
+      } catch (err) {
+        console.error('Settlement failed:', err);
+        alert('Settlement failed. Please try again.');
+      }
+    }
   };
 
   // Handle entity click
@@ -159,7 +181,13 @@ export default function GamePage() {
         <GameUI
           entities={entities}
           player={player}
-          session={sessionState}
+          session={{
+            isConnected: yellowSession.isConnected,
+            isSessionActive: yellowSession.isSessionActive,
+            sessionId: yellowSession.sessionId ?? undefined,
+            actionCount: yellowSession.actionCount,
+            gasSaved: yellowSession.gasSaved,
+          }}
           onUpgrade={handleUpgrade}
           onCompoundAll={handleCompoundAll}
           onSettle={handleSettle}
