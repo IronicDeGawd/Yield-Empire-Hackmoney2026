@@ -4,7 +4,7 @@
  * GameUI - Overlay UI for the game with building cards, stats, and controls
  */
 
-import { Settings, Zap, Plus, Lock } from 'lucide-react';
+import { Settings, Zap, Plus, Lock, ArrowDownUp } from 'lucide-react';
 import { GameEntity, PlayerProfile, GuildProfile, SessionState } from '@/lib/types';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
@@ -16,6 +16,7 @@ interface GameUIProps {
   onUpgrade?: (entityId: string) => void;
   onCompoundAll?: () => void;
   onSettle?: () => void;
+  onDeposit?: () => void;
 }
 
 export function GameUI({
@@ -26,6 +27,7 @@ export function GameUI({
   onUpgrade,
   onCompoundAll,
   onSettle,
+  onDeposit,
 }: GameUIProps) {
   // Calculate total stats
   const totalTVL = entities.reduce((sum, e) => sum + e.deposited, 0);
@@ -168,6 +170,16 @@ export function GameUI({
               <span>[ Compound All ]</span>
               <div className="w-3 h-3 bg-white rotate-45 transform" />
             </button>
+
+            {player && (
+              <button
+                onClick={onDeposit}
+                className="w-full mt-2 bg-purple-700 hover:bg-purple-600 text-white font-bold py-2.5 px-4 rounded-lg border border-purple-500 transition-all flex items-center justify-center gap-2 uppercase text-sm"
+              >
+                <ArrowDownUp size={14} />
+                <span>Deposit from Any Chain</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

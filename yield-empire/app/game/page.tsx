@@ -14,11 +14,13 @@ import { useAccount } from 'wagmi';
 import { useEnsName, useEnsAvatar } from 'wagmi';
 import { STAR_DATA, CLOUD_DATA } from '@/components/game/pixi/effects/Starfield';
 import { useYellowSession } from '@/hooks/useYellowSession';
+import { DepositPanel } from '@/components/game/DepositPanel';
 
 export default function GamePage() {
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
   const [entities, setEntities] = useState<GameEntity[]>(INITIAL_ENTITIES);
   const [selectedEntity, setSelectedEntity] = useState<GameEntity | null>(null);
+  const [isDepositOpen, setIsDepositOpen] = useState(false);
 
   // Wallet connection
   const { address, isConnected } = useAccount();
@@ -191,8 +193,15 @@ export default function GamePage() {
           onUpgrade={handleUpgrade}
           onCompoundAll={handleCompoundAll}
           onSettle={handleSettle}
+          onDeposit={() => setIsDepositOpen(true)}
         />
       </div>
+
+      {/* Cross-chain Deposit Modal */}
+      <DepositPanel
+        isOpen={isDepositOpen}
+        onClose={() => setIsDepositOpen(false)}
+      />
     </div>
   );
 }
