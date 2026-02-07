@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
 import { wagmiConfig } from '@/lib/wagmi-config';
+import { YellowSessionProvider } from '@/components/providers/YellowSessionProvider';
 import { useState } from 'react';
 
 import '@rainbow-me/rainbowkit/styles.css';
@@ -41,7 +42,9 @@ export function Web3Provider({ children }: Web3ProviderProps) {
           })}
           modalSize="compact"
         >
-          {children}
+          <YellowSessionProvider>
+            {children}
+          </YellowSessionProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
