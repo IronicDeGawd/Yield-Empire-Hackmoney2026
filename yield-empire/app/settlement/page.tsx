@@ -4,7 +4,7 @@
  * Settlement Dashboard
  *
  * Shows Yellow Network session status, action breakdown,
- * gas savings calculator, and settle button.
+ * gas savings calculator, settle button, and real transaction results.
  */
 
 import { useState, useMemo } from 'react';
@@ -22,12 +22,29 @@ import {
   Send,
   ChevronRight,
   Shield,
+  ExternalLink,
+  XCircle,
+  Loader2,
 } from 'lucide-react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount } from 'wagmi';
 import { useYellowSession } from '@/hooks/useYellowSession';
 import { usePlayerIdentity } from '@/hooks/useENS';
 import { GAS_COSTS, INITIAL_ENTITIES, BUILDING_CONFIGS } from '@/lib/constants';
+import { SETTLEMENT_CHAINS } from '@/lib/protocols/addresses';
+import type { SettlementTx } from '@/lib/types';
+import { formatUnits } from 'viem';
+
+/** Get block explorer URL for a tx hash on a given chain */
+function explorerUrl(chainId: number, hash: string): string {
+  if (chainId === SETTLEMENT_CHAINS.SEPOLIA) {
+    return `https://sepolia.etherscan.io/tx/${hash}`;
+  }
+  if (chainId === SETTLEMENT_CHAINS.BASE_SEPOLIA) {
+    return `https://sepolia.basescan.org/tx/${hash}`;
+  }
+  return '#';
+}
 
 // Settlement history entry (local state for demo)
 interface SettlementRecord {
@@ -37,6 +54,7 @@ interface SettlementRecord {
   gasSaved: number;
   protocols: string[];
   status: 'completed' | 'pending' | 'failed';
+  transactions?: SettlementTx[];
 }
 
 export default function SettlementPage() {
@@ -44,8 +62,8 @@ export default function SettlementPage() {
   const identity = usePlayerIdentity();
   const yellowSession = useYellowSession();
 
-  // Demo settlement history
-  const [settlements] = useState<SettlementRecord[]>([
+  // Settlement history (populated from real settlements + demo data)
+  const [settlements, setSettlements] = useState<SettlementRecord[]>([
     {
       id: '0xabc\u2026def',
       timestamp: Date.now() - 2 * 60 * 60 * 1000,
@@ -115,7 +133,28 @@ export default function SettlementPage() {
 
     if (confirmed) {
       try {
-        await yellowSession.settleSession();
+        await yellowSession.settleSession(INITIAL_ENTITIES);
+
+        // Add to history from settlement result
+        if (yellowSession.lastSettlement) {
+          const result = yellowSession.lastSettlement;
+          const protocols = result.transactions
+            .filter((tx) => tx.status === 'confirmed')
+            .map((tx) => tx.protocolName);
+
+          setSettlements((prev) => [
+            {
+              id: result.sessionId.slice(0, 10) + '\u2026' + result.sessionId.slice(-6),
+              timestamp: result.timestamp,
+              actionCount: result.actionCount,
+              gasSaved: result.gasSaved,
+              protocols,
+              status: 'completed',
+              transactions: result.transactions,
+            },
+            ...prev,
+          ]);
+        }
       } catch (err) {
         console.error('Settlement failed:', err);
       }
@@ -129,6 +168,12 @@ export default function SettlementPage() {
     deposited: entity.deposited,
     color: entity.color,
   }));
+
+  // Count unique chains in last settlement
+  const lastResult = yellowSession.lastSettlement;
+  const settledChains = lastResult
+    ? new Set(lastResult.transactions.map((tx) => tx.chain)).size
+    : 0;
 
   return (
     <div className="page-scrollable bg-game-bg text-white">
@@ -242,6 +287,69 @@ export default function SettlementPage() {
               </div>
             )}
           </div>
+
+          {/* Last Settlement Results */}
+          {lastResult && (
+            <div className="bg-game-panel border-2 border-green-500/30 rounded-xl p-6">
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <CheckCircle size={20} className="text-green-400" />
+                Settlement Complete
+              </h3>
+              <p className="text-sm text-gray-400 mb-4">
+                {lastResult.actionCount} actions settled in{' '}
+                {lastResult.transactions.length} transactions across{' '}
+                {settledChains} chain{settledChains !== 1 ? 's' : ''}
+              </p>
+
+              <div className="space-y-2">
+                {lastResult.transactions.map((tx, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between bg-game-bg rounded-lg p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      {tx.status === 'confirmed' ? (
+                        <CheckCircle size={16} className="text-green-400" />
+                      ) : tx.status === 'failed' ? (
+                        <XCircle size={16} className="text-red-400" />
+                      ) : (
+                        <Loader2 size={16} className="text-yellow-400 animate-spin" />
+                      )}
+                      <div>
+                        <span className="text-sm font-bold">
+                          {tx.protocolName}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          {tx.chain}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-yellow-400">
+                        {formatUnits(tx.amount, 6)} USDC
+                      </span>
+                      {tx.hash && tx.status === 'confirmed' && (
+                        <a
+                          href={explorerUrl(tx.chainId, tx.hash)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-mono"
+                        >
+                          {tx.hash.slice(0, 8)}&hellip;{tx.hash.slice(-6)}
+                          <ExternalLink size={12} />
+                        </a>
+                      )}
+                      {tx.status === 'failed' && (
+                        <span className="text-xs text-red-400">
+                          {tx.error ?? 'Failed'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Main Grid */}
           <div className="grid md:grid-cols-2 gap-6">
@@ -399,7 +507,7 @@ export default function SettlementPage() {
                 >
                   {yellowSession.isSettling ? (
                     <>
-                      <Clock size={20} className="animate-spin" />
+                      <Loader2 size={20} className="animate-spin" />
                       Settling&hellip;
                     </>
                   ) : (
@@ -439,40 +547,76 @@ export default function SettlementPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {settlements.map((record) => (
+                {settlements.map((record, idx) => (
                   <div
-                    key={record.id}
-                    className="flex items-center justify-between bg-game-bg rounded-lg p-4"
+                    key={`${record.id}-${idx}`}
+                    className="bg-game-bg rounded-lg p-4"
                   >
-                    <div className="flex items-center gap-3">
-                      <CheckCircle
-                        size={20}
-                        className={
-                          record.status === 'completed'
-                            ? 'text-green-400'
-                            : record.status === 'pending'
-                              ? 'text-yellow-400'
-                              : 'text-red-400'
-                        }
-                      />
-                      <div>
-                        <div className="font-bold text-sm">
-                          {record.actionCount} actions settled
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle
+                          size={20}
+                          className={
+                            record.status === 'completed'
+                              ? 'text-green-400'
+                              : record.status === 'pending'
+                                ? 'text-yellow-400'
+                                : 'text-red-400'
+                          }
+                        />
+                        <div>
+                          <div className="font-bold text-sm">
+                            {record.actionCount} actions settled
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(record.timestamp).toLocaleString()} &middot;{' '}
+                            {record.protocols.join(', ')}
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {new Date(record.timestamp).toLocaleString()} &middot;{' '}
-                          {record.protocols.join(', ')}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-green-400">
+                          ${record.gasSaved.toFixed(2)} saved
+                        </div>
+                        <div className="text-xs text-gray-500 font-mono">
+                          {record.id}
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-green-400">
-                        ${record.gasSaved.toFixed(2)} saved
+
+                    {/* Show tx details if available */}
+                    {record.transactions && record.transactions.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-game-border/50 space-y-1">
+                        {record.transactions.map((tx, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between text-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              {tx.status === 'confirmed' ? (
+                                <CheckCircle size={12} className="text-green-400" />
+                              ) : (
+                                <XCircle size={12} className="text-red-400" />
+                              )}
+                              <span className="text-gray-400">
+                                {tx.protocolName} ({tx.chain})
+                              </span>
+                            </div>
+                            {tx.hash && tx.status === 'confirmed' && (
+                              <a
+                                href={explorerUrl(tx.chainId, tx.hash)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-400 hover:text-blue-300 flex items-center gap-1 font-mono"
+                              >
+                                {tx.hash.slice(0, 8)}&hellip;{tx.hash.slice(-6)}
+                                <ExternalLink size={10} />
+                              </a>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                      <div className="text-xs text-gray-500 font-mono">
-                        {record.id}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>

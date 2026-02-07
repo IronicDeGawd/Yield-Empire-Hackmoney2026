@@ -113,7 +113,7 @@ export default function GamePage() {
     }
   };
 
-  // Handle settlement
+  // Handle settlement — passes entities for real protocol execution
   const handleSettle = async () => {
     const confirmed = confirm(
       `Settle ${yellowSession.actionCount} actions?\nEstimated gas saved: $${yellowSession.gasSaved.toFixed(2)}`
@@ -121,7 +121,7 @@ export default function GamePage() {
 
     if (confirmed) {
       try {
-        await yellowSession.settleSession();
+        await yellowSession.settleSession(entities);
         alert('Settlement complete! Actions batched into on-chain transactions.');
       } catch (err) {
         console.error('Settlement failed:', err);
