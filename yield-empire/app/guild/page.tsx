@@ -196,7 +196,7 @@ export default function GuildPage() {
                   </div>
                   {guild?.treasuryAddress && (
                     <div className="mt-2 text-xs text-gray-500 font-mono">
-                      Treasury: {guild.treasuryAddress.slice(0, 10)}...
+                      Treasury: {guild.treasuryAddress.slice(0, 10)}&hellip;
                       {guild.treasuryAddress.slice(-8)}
                     </div>
                   )}
@@ -226,7 +226,7 @@ export default function GuildPage() {
 
             {isGuildLoading && (
               <div className="mt-4 text-sm text-gray-500 animate-pulse">
-                Loading guild data from ENS...
+                Loading guild data from ENS&hellip;
               </div>
             )}
             {guildError && (
@@ -296,17 +296,21 @@ export default function GuildPage() {
               ) : showJoinForm ? (
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">
+                    <label htmlFor="member-label" className="text-xs text-gray-400 uppercase tracking-wider block mb-1">
                       Your Member Name
                     </label>
                     <div className="flex items-center gap-1 text-sm">
                       <input
+                        id="member-label"
                         type="text"
+                        name="memberLabel"
+                        autoComplete="username"
+                        spellCheck={false}
                         value={memberLabel}
                         onChange={(e) =>
                           setMemberLabel(e.target.value.toLowerCase())
                         }
-                        placeholder="alice"
+                        placeholder="e.g. alice"
                         className="flex-1 bg-game-bg border border-game-border rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
                       />
                       <span className="text-gray-500 shrink-0">
@@ -340,7 +344,7 @@ export default function GuildPage() {
                       disabled={isJoining || !memberLabel}
                       className="flex-1 btn-gold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isJoining ? 'Creating...' : '[ Join ]'}
+                      {isJoining ? 'Creating\u2026' : '[ Join ]'}
                     </button>
                     <button
                       onClick={() => setShowJoinForm(false)}
@@ -387,7 +391,7 @@ export default function GuildPage() {
 
               {isMembersLoading || isLoadingProfiles ? (
                 <div className="text-sm text-gray-500 animate-pulse py-8 text-center">
-                  Loading members from ENS subgraph...
+                  Loading members from ENS subgraph\u2026
                 </div>
               ) : membersError ? (
                 <div className="text-sm text-red-400 py-8 text-center">
@@ -439,7 +443,7 @@ export default function GuildPage() {
                         <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-md shrink-0" />
                         <span className="text-white truncate">
                           {member.ensName ??
-                            `${member.address.slice(0, 6)}...${member.address.slice(-4)}`}
+                            `${member.address.slice(0, 6)}\u2026${member.address.slice(-4)}`}
                         </span>
                       </div>
                       <div className="col-span-2 text-right text-purple-300">

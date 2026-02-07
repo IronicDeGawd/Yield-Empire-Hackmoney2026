@@ -47,6 +47,8 @@ export function GameUI({
                   <img
                     src={player.avatar}
                     alt="avatar"
+                    width={40}
+                    height={40}
                     className="w-full h-full object-cover"
                     style={{ imageRendering: 'pixelated' }}
                   />
@@ -57,7 +59,7 @@ export function GameUI({
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-lg tracking-wide">
-                    {player.ensName || `${player.address.slice(0, 6)}...${player.address.slice(-4)}`}
+                    {player.ensName || `${player.address.slice(0, 6)}\u2026${player.address.slice(-4)}`}
                   </span>
                   <span className="text-xs bg-purple-600 px-1 rounded text-purple-200">
                     Lv.{player.empireLevel}

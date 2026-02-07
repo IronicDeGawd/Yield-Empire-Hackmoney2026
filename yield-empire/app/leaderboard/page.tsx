@@ -221,6 +221,7 @@ export default function LeaderboardPage() {
               <select
                 value={selectedGuild}
                 onChange={(e) => setSelectedGuild(e.target.value)}
+                aria-label="Select guild for player rankings"
                 className="px-4 py-2.5 bg-game-panel border border-game-border rounded-lg text-sm text-gray-400 focus:outline-none focus:border-purple-500"
               >
                 {DEMO_GUILDS.map((g) => (
@@ -247,7 +248,7 @@ export default function LeaderboardPage() {
 
               {isLoadingGuilds ? (
                 <div className="text-sm text-gray-500 animate-pulse py-12 text-center">
-                  Loading guild rankings from ENS...
+                  Loading guild rankings from ENS\u2026
                 </div>
               ) : guildsError ? (
                 <div className="text-sm text-red-400 py-12 text-center">
@@ -324,7 +325,7 @@ export default function LeaderboardPage() {
 
               {isLoadingPlayers ? (
                 <div className="text-sm text-gray-500 animate-pulse py-12 text-center">
-                  Loading player rankings from ENS...
+                  Loading player rankings from ENS\u2026
                 </div>
               ) : playersError ? (
                 <div className="text-sm text-red-400 py-12 text-center">
@@ -370,6 +371,8 @@ export default function LeaderboardPage() {
                               <img
                                 src={player.avatar}
                                 alt=""
+                                width={32}
+                                height={32}
                                 className="w-full h-full object-cover"
                               />
                             )}
@@ -377,7 +380,7 @@ export default function LeaderboardPage() {
                           <div>
                             <div className="font-bold text-white flex items-center gap-2">
                               {player.ensName ??
-                                `${player.address.slice(0, 6)}...${player.address.slice(-4)}`}
+                                `${player.address.slice(0, 6)}\u2026${player.address.slice(-4)}`}
                               {isCurrentUser && (
                                 <span className="text-xs bg-purple-600 px-1.5 rounded text-purple-200">
                                   You

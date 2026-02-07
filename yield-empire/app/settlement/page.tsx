@@ -47,7 +47,7 @@ export default function SettlementPage() {
   // Demo settlement history
   const [settlements] = useState<SettlementRecord[]>([
     {
-      id: '0xabc...def',
+      id: '0xabc\u2026def',
       timestamp: Date.now() - 2 * 60 * 60 * 1000,
       actionCount: 23,
       gasSaved: 9.2,
@@ -55,7 +55,7 @@ export default function SettlementPage() {
       status: 'completed',
     },
     {
-      id: '0x123...456',
+      id: '0x123\u2026456',
       timestamp: Date.now() - 8 * 60 * 60 * 1000,
       actionCount: 47,
       gasSaved: 18.8,
@@ -208,7 +208,7 @@ export default function SettlementPage() {
                   </div>
                   {yellowSession.sessionId && (
                     <div className="text-xs text-gray-600 font-mono mt-1">
-                      Session: {yellowSession.sessionId.slice(0, 10)}...
+                      Session: {yellowSession.sessionId.slice(0, 10)}&hellip;
                       {yellowSession.sessionId.slice(-8)}
                     </div>
                   )}
@@ -400,7 +400,7 @@ export default function SettlementPage() {
                   {yellowSession.isSettling ? (
                     <>
                       <Clock size={20} className="animate-spin" />
-                      Settling...
+                      Settling&hellip;
                     </>
                   ) : (
                     <>
