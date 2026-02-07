@@ -1,0 +1,22 @@
+{
+  "name": "yield-empire-contracts",
+  "version": "1.0.0",
+  "description": "YieldEmpireTreasury contract for Aave V3 settlement on Base Sepolia",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.ts --network baseSepolia",
+    "generate-wallet": "npx tsx scripts/generate-wallet.ts",
+    "check-balance": "npx tsx scripts/check-balance.ts",
+    "fund-treasury": "npx tsx scripts/fund-treasury.ts",
+    "verify": "hardhat verify --network baseSepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0",
+    "@openzeppelin/contracts": "^5.1.0",
+    "dotenv": "^16.4.0",
+    "tsx": "^4.19.0"
+  }
+}
