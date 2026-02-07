@@ -64,6 +64,7 @@ export class YellowSessionManager {
   private appSessionId: Hex | null = null;
   private stateVersion: number = 0;
   private actionCount: number = 0;
+  private initialUsdcAmount: string = '100000000';
   private jwtToken: string | null = null;
   private brokerAddress: Address | null = null;
 
@@ -154,8 +155,10 @@ export class YellowSessionManager {
       throw new Error('Not authenticated');
     }
 
+    this.initialUsdcAmount = initialUsdcAmount;
+
     const allocations: RPCAppSessionAllocation[] = [
-      { participant: userAddress, asset: 'usdc', amount: initialUsdcAmount },
+      { participant: userAddress, asset: 'usdc', amount: this.initialUsdcAmount },
       { participant: this.brokerAddress, asset: 'usdc', amount: '0' },
     ];
 
@@ -198,13 +201,12 @@ export class YellowSessionManager {
       throw new Error('No active session');
     }
 
-    this.stateVersion++;
+    const nextVersion = this.stateVersion + 1;
 
-    // CRITICAL: Allocations must include ALL participants and maintain total balance
-    // For now, keep allocations unchanged (user still has all funds)
+    // Allocations must include ALL participants and maintain total balance
     const allocations: RPCAppSessionAllocation[] = [
-      { participant: userAddress, asset: 'usdc', amount: '100000000' }, // User keeps 100 USDC
-      { participant: this.brokerAddress, asset: 'usdc', amount: '0' }, // Broker has 0
+      { participant: userAddress, asset: 'usdc', amount: this.initialUsdcAmount },
+      { participant: this.brokerAddress, asset: 'usdc', amount: '0' },
     ];
 
     const message = await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_4>(
@@ -212,7 +214,7 @@ export class YellowSessionManager {
       {
         app_session_id: this.appSessionId,
         intent: RPCAppStateIntent.Operate,
-        version: this.stateVersion,
+        version: nextVersion,
         allocations,
         session_data: JSON.stringify({
           action,
@@ -224,7 +226,8 @@ export class YellowSessionManager {
 
     await this.sendAndWait(message, 'submit_app_state');
 
-    // Update action count and gas savings
+    // Only increment after successful confirmation
+    this.stateVersion = nextVersion;
     this.actionCount++;
     this.emitState();
   }
@@ -237,10 +240,10 @@ export class YellowSessionManager {
       throw new Error('No active session');
     }
 
-    // CRITICAL: close_app_session requires final allocations for ALL participants
-    // If no allocations provided, use default (user gets all funds back)
+    // close_app_session requires final allocations for ALL participants
+    // If no allocations provided, default returns all funds to user
     const allocations = finalAllocations.length > 0 ? finalAllocations : [
-      { participant: userAddress, asset: 'usdc', amount: '100000000' },
+      { participant: userAddress, asset: 'usdc', amount: this.initialUsdcAmount },
       { participant: this.brokerAddress, asset: 'usdc', amount: '0' },
     ];
 
@@ -259,6 +262,7 @@ export class YellowSessionManager {
     this.appSessionId = null;
     this.actionCount = 0;
     this.stateVersion = 0;
+    this.initialUsdcAmount = '100000000';
     this.emitState();
   }
 
