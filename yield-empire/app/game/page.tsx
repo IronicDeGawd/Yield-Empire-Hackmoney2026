@@ -84,13 +84,22 @@ export default function GamePage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Stable references from Yellow session context
+  const {
+    isConnected: ysConnected,
+    isConnecting: ysConnecting,
+    isSessionActive: ysSessionActive,
+    connect: ysConnect,
+    createSession: ysCreateSession,
+  } = yellowSession;
+
   // ── Yield accrual timer ──────────────────────────────────────────────
   // Accrues yield every 2 seconds (demo speed: 1 tick = ~10 min of real time)
   const entitiesRef = useRef(entities);
   entitiesRef.current = entities;
 
   useEffect(() => {
-    if (!yellowSession.isSessionActive) return;
+    if (!ysSessionActive) return;
 
     const interval = setInterval(() => {
       let tickYield = 0;
@@ -107,29 +116,26 @@ export default function GamePage() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [yellowSession.isSessionActive]);
+  }, [ysSessionActive]);
 
   // ── Auto-connect to Yellow Network ───────────────────────────────────
+
   useEffect(() => {
-    if (isConnected && !yellowSession.isConnected && !yellowSession.isConnecting) {
-      yellowSession.connect().catch((err) => {
+    if (isConnected && !ysConnected && !ysConnecting) {
+      ysConnect().catch((err) => {
         console.error('Failed to connect to Yellow Network:', err);
       });
     }
-  }, [isConnected, yellowSession]);
+  }, [isConnected, ysConnected, ysConnecting, ysConnect]);
 
   // Auto-create session after Yellow Network connects
   useEffect(() => {
-    if (
-      yellowSession.isConnected &&
-      !yellowSession.isSessionActive &&
-      !yellowSession.isConnecting
-    ) {
-      yellowSession.createSession().catch((err) => {
+    if (ysConnected && !ysSessionActive && !ysConnecting) {
+      ysCreateSession().catch((err) => {
         console.error('Failed to create Yellow Network session:', err);
       });
     }
-  }, [yellowSession.isConnected, yellowSession.isSessionActive, yellowSession]);
+  }, [ysConnected, ysSessionActive, ysConnecting, ysCreateSession]);
 
   // ── Game actions ─────────────────────────────────────────────────────
 

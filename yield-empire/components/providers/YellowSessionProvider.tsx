@@ -106,6 +106,8 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
   const [lastSettlement, setLastSettlement] = useState<SettlementResult | null>(null);
 
   const managerRef = useRef<YellowSessionManager | null>(null);
+  const sessionStateRef = useRef(sessionState);
+  sessionStateRef.current = sessionState;
 
   // Initialize session manager once for the entire app lifetime
   useEffect(() => {
@@ -199,9 +201,10 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
     setIsSettling(true);
     setError(null);
 
-    const currentSessionId = sessionState.sessionId ?? 'unknown';
-    const currentActionCount = sessionState.actionCount;
-    const currentGasSaved = sessionState.gasSaved;
+    // Read from ref to avoid stale closures without extra deps
+    const currentSessionId = sessionStateRef.current.sessionId ?? 'unknown';
+    const currentActionCount = sessionStateRef.current.actionCount;
+    const currentGasSaved = sessionStateRef.current.gasSaved;
 
     try {
       // Step 1: Close Yellow Network session
@@ -279,7 +282,7 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsSettling(false);
     }
-  }, [address, walletClient, sessionState.sessionId, sessionState.actionCount, sessionState.gasSaved]);
+  }, [address, walletClient]);
 
   const disconnect = useCallback(() => {
     if (managerRef.current) {
