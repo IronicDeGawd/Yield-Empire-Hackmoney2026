@@ -35,18 +35,12 @@ export function PixiApplication({ width, height, children, onInit }: PixiApplica
     return () => {
       destroyedRef.current = true;
       setMounted(false);
-
-      // Explicitly destroy the PixiJS app to release WebGL context.
-      // @pixi/react schedules destruction asynchronously which can race
-      // with re-mounting when navigating between pages.
-      if (appRef.current) {
-        try {
-          appRef.current.destroy();
-        } catch {
-          // Already destroyed by @pixi/react — safe to ignore
-        }
-        appRef.current = null;
-      }
+      // Do NOT call app.destroy() here — setting mounted=false unmounts the
+      // <Application> component, which lets @pixi/react clean up useTick,
+      // resize observers, and the WebGL context in the correct order.
+      // Calling destroy() before React unmounts children causes null-pointer
+      // crashes in Ticker.remove and ResizePlugin.destroy.
+      appRef.current = null;
     };
   }, []);
 
