@@ -22,6 +22,7 @@ import { BuildingPopup } from '@/components/game/BuildingPopup';
 import type { HoverInfo } from '@/components/game/PixiIsometricMap';
 import { GameUI } from '@/components/game/GameUI';
 import { SettleConfirmDialog } from '@/components/game/SettleConfirmDialog';
+import { DeFiGuide } from '@/components/game/DeFiGuide';
 import { INITIAL_ENTITIES, INITIAL_CONNECTIONS, YIELD_MULTIPLIER_PER_LEVEL, getUpgradeCost } from '@/lib/constants';
 import { GameEntity, PlayerProfile, GameEffect, GameEffectType } from '@/lib/types';
 import { useAccount } from 'wagmi';
@@ -511,6 +512,11 @@ export default function GamePage() {
 
       {/* UI Overlay Layer */}
       <div className="absolute inset-0 z-20">
+        {/* DeFi Educational Guide - Left Side */}
+        <div className="absolute left-6 top-1/2 -translate-y-1/2">
+          <DeFiGuide />
+        </div>
+
         <GameUI
           entities={entities}
           player={player}
