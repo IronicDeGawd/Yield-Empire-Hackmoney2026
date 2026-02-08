@@ -17,6 +17,11 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
+    sepolia: {
+      url: process.env.SEPOLIA_RPC || "https://ethereum-sepolia-rpc.publicnode.com",
+      accounts: DEPLOYER_KEY ? [DEPLOYER_KEY] : [],
+      chainId: 11155111,
+    },
     baseSepolia: {
       url: process.env.BASE_SEPOLIA_RPC || "https://sepolia.base.org",
       accounts: DEPLOYER_KEY ? [DEPLOYER_KEY] : [],
