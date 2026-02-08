@@ -82,6 +82,19 @@ export default function GamePage() {
   const MAX_CONNECT_ATTEMPTS = 4;
   const connectAttemptsRef = useRef(0);
 
+  // Retry limit for auto-create session (max 3 attempts)
+  const MAX_SESSION_ATTEMPTS = 3;
+  const sessionAttemptsRef = useRef(0);
+
+  // Track whether the component is mounted to prevent stale async operations
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Wallet connection
   const { address, isConnected } = useAccount();
 
@@ -225,10 +238,13 @@ export default function GamePage() {
   // ── Auto-connect to Yellow Network (max 4 attempts) ────────────────
 
   useEffect(() => {
+    if (!isMountedRef.current) return;
     if (isConnected && !ysConnected && !ysConnecting && connectAttemptsRef.current < MAX_CONNECT_ATTEMPTS) {
       connectAttemptsRef.current++;
       ysConnect().catch((err) => {
-        console.error(`Yellow Network connect attempt ${connectAttemptsRef.current}/${MAX_CONNECT_ATTEMPTS} failed:`, err);
+        if (isMountedRef.current) {
+          console.error(`Yellow Network connect attempt ${connectAttemptsRef.current}/${MAX_CONNECT_ATTEMPTS} failed:`, err);
+        }
       });
     }
   }, [isConnected, ysConnected, ysConnecting, ysConnect]);
@@ -240,14 +256,22 @@ export default function GamePage() {
     }
   }, [ysConnected]);
 
-  // Auto-create session after Yellow Network connects
+  // Auto-create session after Yellow Network connects (max 3 attempts)
   useEffect(() => {
-    if (ysConnected && !ysSessionActive && !ysConnecting) {
+    if (ysConnected && !ysSessionActive && !ysConnecting && sessionAttemptsRef.current < MAX_SESSION_ATTEMPTS) {
+      sessionAttemptsRef.current++;
       ysCreateSession().catch((err) => {
-        console.error('Failed to create Yellow Network session:', err);
+        console.error(`Session create attempt ${sessionAttemptsRef.current}/${MAX_SESSION_ATTEMPTS} failed:`, err);
       });
     }
   }, [ysConnected, ysSessionActive, ysConnecting, ysCreateSession]);
+
+  // Reset session attempt counter on successful session creation
+  useEffect(() => {
+    if (ysSessionActive) {
+      sessionAttemptsRef.current = 0;
+    }
+  }, [ysSessionActive]);
 
   // ── Persist helper ──────────────────────────────────────────────────
   const persistState = useCallback(() => {
