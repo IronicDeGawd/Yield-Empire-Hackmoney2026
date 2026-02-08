@@ -127,7 +127,24 @@ export const TREASURY_ABI = [
     outputs: [],
   },
   {
+    name: 'registerBridgeMint',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'player', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
     name: 'playerDeposits',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'player', type: 'address' }],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    name: 'aaveAllocations',
     type: 'function',
     stateMutability: 'view',
     inputs: [{ name: 'player', type: 'address' }],
