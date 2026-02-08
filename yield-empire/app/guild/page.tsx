@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Users,
@@ -35,14 +36,22 @@ import {
 } from '@/lib/ens/guild-manager';
 import type { PlayerProfile } from '@/lib/types';
 
-// Demo guild name for the hackathon
-const DEMO_GUILD = 'yield-warriors.eth';
+// Guild name for the hackathon (registered on Sepolia)
+const DEMO_GUILD = 'yield-empire.eth';
 
 export default function GuildPage() {
+  const router = useRouter();
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
   const identity = usePlayerIdentity();
+
+  // Route guard: redirect to landing if wallet not connected
+  useEffect(() => {
+    if (!isConnected) {
+      router.replace('/');
+    }
+  }, [isConnected, router]);
 
   const [guildName, setGuildName] = useState(DEMO_GUILD);
   const [memberLabel, setMemberLabel] = useState('');
@@ -166,7 +175,7 @@ export default function GuildPage() {
       </header>
 
       {/* Content */}
-      <main className="pt-24 px-6 pb-12">
+      <main id="main-content" className="pt-24 px-6 pb-12">
         <div className="max-w-5xl mx-auto space-y-6">
           {/* Guild Info Card */}
           <div className="bg-game-panel border-2 border-game-border rounded-xl p-6">

@@ -24,12 +24,19 @@ import { drawCrystalGlow } from './pixi/effects/GlowEffect';
 import { type GameSpriteTextures, loadGameSpriteTextures } from './pixi/assets';
 import { CLOUD_DATA, type CloudData } from './pixi/effects/Starfield';
 
+export interface HoverInfo {
+  entity: GameEntity;
+  screenX: number;
+  screenY: number;
+}
+
 interface PixiIsometricMapProps {
   entities: GameEntity[];
   connections: Connection[];
   width: number;
   height: number;
   onEntityClick?: (entity: GameEntity) => void;
+  onEntityHover?: (info: HoverInfo | null) => void;
 }
 
 /**
@@ -42,6 +49,7 @@ function IsometricScene({
   width,
   height,
   onEntityClick,
+  onEntityHover,
   textures,
 }: PixiIsometricMapProps & { textures: GameSpriteTextures }) {
   const timeRef = useRef(0);
@@ -72,27 +80,6 @@ function IsometricScene({
     return map;
   }, [entities, origin]);
 
-  // Tick animation — accumulate time and redraw effects layer
-  useTick((ticker) => {
-    timeRef.current += ticker.deltaTime / 60;
-    const g = effectsRef.current;
-    if (!g) return;
-
-    g.clear();
-
-    sortedEntities.forEach((entity) => {
-      const pos = gridToScreen(entity.position.x, entity.position.y, origin);
-
-      if (entity.type === 'factory') {
-        drawSmokeParticles(g, pos.x, pos.y + 18, timeRef.current);
-      }
-
-      if (entity.type === 'crystal') {
-        drawCrystalGlow(g, pos.x, pos.y, entity.color, timeRef.current);
-      }
-    });
-  });
-
   const isTopLeftBridge = useCallback((fromId: string, toId: string) => {
     const key = [fromId, toId].sort().join('-');
     return key === 'e1-e2' || key === 'e3-e4';
@@ -118,9 +105,9 @@ function IsometricScene({
   const BUILDING_HOVER_SCALE = 1.08;
   const BRIDGE_SPRITE_HEIGHT = 48;
   const BRIDGE_SPRITE_SCALE = (TILE_HEIGHT / BRIDGE_SPRITE_HEIGHT) * 0.9 * GRID_SPACING;
-  const BRIDGE_OFFSET_Y = -8;
+  const BRIDGE_OFFSET_Y = -48;
   const PLATFORM_BASE_OFFSET_Y = TILE_HEIGHT / 2 + BLOCK_HEIGHT;
-  const BUILDING_BASE_OFFSET_Y = -20;
+  const BUILDING_BASE_OFFSET_Y = -45;
 
   // Cloud animation — imperatively updated each frame via container refs
   const cloudContainerRefs = useRef<(PixiContainerClass | null)[]>(
@@ -129,18 +116,24 @@ function IsometricScene({
   const cloudOffsets = useRef(CLOUD_DATA.map((c) => c.startOffset));
 
   // Compute cloud pixel position from normalized offset
+  // Uses lane for perpendicular offset to spread clouds across parallel paths
   const getCloudPos = useCallback(
     (cloud: CloudData, offset: number) => {
       const margin = 200;
+      // Lane offset perpendicular to the diagonal direction
+      const laneOffsetAmount = cloud.lane * (height * 0.5);
+
       if (cloud.direction === 'tr-bl') {
+        // Top-right to bottom-left: lane shifts along the perpendicular (bottom-right to top-left)
         return {
-          x: (width + margin) * (1 - offset) - margin / 2,
-          y: (height + margin) * offset - margin / 2,
+          x: (width + margin) * (1 - offset) - margin / 2 + laneOffsetAmount * 0.7,
+          y: (height + margin) * offset - margin / 2 + laneOffsetAmount * 0.7,
         };
       }
+      // Top-left to bottom-right: lane shifts along the perpendicular (top-right to bottom-left)
       return {
-        x: (width + margin) * offset - margin / 2,
-        y: (height + margin) * offset - margin / 2,
+        x: (width + margin) * offset - margin / 2 + laneOffsetAmount * 0.7,
+        y: (height + margin) * offset - margin / 2 - laneOffsetAmount * 0.7,
       };
     },
     [width, height]
@@ -174,7 +167,7 @@ function IsometricScene({
     sortedEntities.forEach((entity) => {
       const pos = gridToScreen(entity.position.x, entity.position.y, origin);
       if (entity.type === 'factory') {
-        drawSmokeParticles(g, pos.x, pos.y + 18, timeRef.current);
+        drawSmokeParticles(g, pos.x, pos.y + 8, timeRef.current);
       }
       if (entity.type === 'crystal') {
         drawCrystalGlow(g, pos.x, pos.y, entity.color, timeRef.current);
@@ -246,10 +239,14 @@ function IsometricScene({
             eventMode="static"
             cursor="pointer"
             onPointerDown={() => onEntityClick?.(entity)}
-            onPointerEnter={() => setHoveredId(entity.id)}
-            onPointerLeave={() =>
-              setHoveredId((prev) => (prev === entity.id ? null : prev))
-            }
+            onPointerEnter={() => {
+              setHoveredId(entity.id);
+              onEntityHover?.({ entity, screenX: pos.x, screenY: pos.y + BUILDING_BASE_OFFSET_Y - 80 });
+            }}
+            onPointerLeave={() => {
+              setHoveredId((prev) => (prev === entity.id ? null : prev));
+              onEntityHover?.(null);
+            }}
           >
             <pixiSprite
               texture={textures.island}
@@ -275,7 +272,7 @@ function IsometricScene({
       {/* Animated effects layer (smoke, glow) */}
       <pixiGraphics
         ref={effectsRef}
-        draw={() => {/* initial draw is no-op; useTick redraws imperatively */}}
+        draw={() => {/* initial draw is no-op; useTick redraws imperatively */ }}
       />
 
       {/* Foreground clouds — over islands for depth */}

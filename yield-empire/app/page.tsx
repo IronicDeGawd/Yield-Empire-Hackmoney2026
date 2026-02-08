@@ -5,11 +5,11 @@
  * Hero with animated preview and call to action
  */
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Zap, Users, Coins, ArrowRight } from 'lucide-react';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { ConnectButton, useConnectModal } from '@rainbow-me/rainbowkit';
 import { useAccount } from 'wagmi';
-import { useMemo } from 'react';
 
 // Pre-computed star positions to avoid hydration mismatch
 const STAR_POSITIONS = [
@@ -37,6 +37,16 @@ const STAR_POSITIONS = [
 
 export default function Home() {
   const { isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
+  const router = useRouter();
+
+  const handlePlay = () => {
+    if (isConnected) {
+      router.push('/game');
+    } else if (openConnectModal) {
+      openConnectModal();
+    }
+  };
 
   return (
     <div className="page-scrollable bg-game-bg text-white">
@@ -44,7 +54,7 @@ export default function Home() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-game-bg/80 backdrop-blur-md border-b border-game-border">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg" />
+            <Image src="/logo.png" alt="Yield Empire" width={32} height={32} className="rounded-lg" />
             <span className="font-bold text-xl">Yield Empire</span>
           </div>
           <ConnectButton showBalance={false} />
@@ -52,7 +62,7 @@ export default function Home() {
       </header>
 
       {/* Hero Section */}
-      <main className="pt-24 px-6">
+      <main id="main-content" className="pt-24 px-6">
         <div className="max-w-7xl mx-auto">
           {/* Hero Content */}
           <div className="text-center py-20">
@@ -64,13 +74,13 @@ export default function Home() {
               Powered by Yellow Network & ENS.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/game"
+              <button
+                onClick={handlePlay}
                 className="btn-gold flex items-center justify-center gap-2 text-lg"
               >
-                {isConnected ? 'Enter Empire' : 'Start Playing'}
+                {isConnected ? 'Enter Empire' : 'Connect Wallet to Play'}
                 <ArrowRight size={20} />
-              </Link>
+              </button>
               <a
                 href="#features"
                 className="px-6 py-3 rounded-lg border-2 border-purple-500 text-purple-400 hover:bg-purple-500/10 transition-colors"
@@ -83,11 +93,9 @@ export default function Home() {
           {/* Animated Preview */}
           <div className="relative max-w-4xl mx-auto mb-20">
             <div className="aspect-video rounded-2xl bg-game-panel border-2 border-game-border overflow-hidden relative">
-              {/* Placeholder for game preview */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl animate-float" />
-                  <p className="text-gray-400">Game Preview</p>
+                  <Image src="/logo.png" alt="Yield Empire" width={200} height={200} className="mx-auto mb-4 animate-float" />
                 </div>
               </div>
               {/* Decorative stars - pre-computed positions to avoid hydration mismatch */}

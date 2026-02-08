@@ -8,7 +8,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import {
   // Auth functions
   createAuthRequestMessage,
-  createAuthVerifyMessageFromChallenge,
+  createAuthVerifyMessage,
   createAuthVerifyMessageWithJWT,
 
   // App session functions
@@ -40,17 +40,22 @@ import { NETWORKS, GAME_PROTOCOL, CHALLENGE_PERIOD } from '@/lib/config/networks
 import { GameAction, SessionState } from '@/lib/types';
 import { GAS_COSTS } from '@/lib/constants';
 
-// Yellow Network RPC response types
-interface RPCResponse<T = any> {
-  res: [number, string, T, number]; // [requestId, method, result, timestamp]
+// Yellow Network RPC message types
+// Success: { res: [requestId, method, result, timestamp], sig?: [...] }
+// Error:   { err: [requestId, errorCode, errorMessage, timestamp] }
+interface RPCMessage {
+  res?: [number, string, any, number];
+  err?: [number, number, string, number];
   sig?: string[];
 }
 
 interface AuthVerifyResult {
   address: Address;
-  sessionKey: Address;
+  sessionKey?: Address;
+  session_key?: Address;   // broker sends snake_case
   success: boolean;
   jwtToken?: string;
+  jwt_token?: string;      // broker sends snake_case
 }
 
 /**
@@ -65,7 +70,9 @@ export class YellowSessionManager {
   private stateVersion: number = 0;
   private actionCount: number = 0;
   private gasSavedTotal: number = 0;
-  private initialUsdcAmount: string = '100000000';
+  private actionBreakdown: Record<string, number> = {};
+  private initialAmount: string = '0'; // zero-deposit session (no custody deposit needed for demo)
+  private assetSymbol: string = 'ytest.usd'; // broker's supported asset symbol
   private jwtToken: string | null = null;
   private brokerAddress: Address | null = null;
 
@@ -119,15 +126,7 @@ export class YellowSessionManager {
       this.isConnecting = false;
       this.emitState();
     } catch (error) {
-      // Clean up ping interval and WebSocket on failed connect/auth
-      if (this.pingInterval) {
-        clearInterval(this.pingInterval);
-        this.pingInterval = null;
-      }
-      if (this.ws) {
-        this.ws.close();
-        this.ws = null;
-      }
+      this.cleanupConnection();
       this.isConnecting = false;
       this.emitState();
       throw error;
@@ -138,16 +137,7 @@ export class YellowSessionManager {
    * Disconnect and cleanup
    */
   disconnect(): void {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
-    }
-
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-
+    this.cleanupConnection();
     this.isAuthenticated = false;
     this.isSessionActive = false;
     this.appSessionId = null;
@@ -159,17 +149,17 @@ export class YellowSessionManager {
    */
   async createGameSession(
     userAddress: Address,
-    initialUsdcAmount: string = '100000000' // 100 USDC (6 decimals)
+    initialAmount: string = '0' // zero-deposit for demo
   ): Promise<Hex> {
     if (!this.sessionSigner || !this.brokerAddress) {
       throw new Error('Not authenticated');
     }
 
-    this.initialUsdcAmount = initialUsdcAmount;
+    this.initialAmount = initialAmount;
 
     const allocations: RPCAppSessionAllocation[] = [
-      { participant: userAddress, asset: 'usdc', amount: this.initialUsdcAmount },
-      { participant: this.brokerAddress, asset: 'usdc', amount: '0' },
+      { participant: userAddress, asset: this.assetSymbol, amount: this.initialAmount },
+      { participant: this.brokerAddress, asset: this.assetSymbol, amount: '0' },
     ];
 
     const message = await createAppSessionMessage(
@@ -215,8 +205,8 @@ export class YellowSessionManager {
 
     // Allocations must include ALL participants and maintain total balance
     const allocations: RPCAppSessionAllocation[] = [
-      { participant: userAddress, asset: 'usdc', amount: this.initialUsdcAmount },
-      { participant: this.brokerAddress, asset: 'usdc', amount: '0' },
+      { participant: userAddress, asset: this.assetSymbol, amount: this.initialAmount },
+      { participant: this.brokerAddress, asset: this.assetSymbol, amount: '0' },
     ];
 
     const message = await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_4>(
@@ -240,6 +230,7 @@ export class YellowSessionManager {
     this.stateVersion = nextVersion;
     this.actionCount++;
     this.gasSavedTotal += this.getActionGasCost(action);
+    this.actionBreakdown[action.type] = (this.actionBreakdown[action.type] || 0) + 1;
     this.emitState();
   }
 
@@ -254,8 +245,8 @@ export class YellowSessionManager {
     // close_app_session requires final allocations for ALL participants
     // If no allocations provided, default returns all funds to user
     const allocations = finalAllocations.length > 0 ? finalAllocations : [
-      { participant: userAddress, asset: 'usdc', amount: this.initialUsdcAmount },
-      { participant: this.brokerAddress, asset: 'usdc', amount: '0' },
+      { participant: userAddress, asset: this.assetSymbol, amount: this.initialAmount },
+      { participant: this.brokerAddress, asset: this.assetSymbol, amount: '0' },
     ];
 
     const message = await createCloseAppSessionMessage(this.sessionSigner, {
@@ -272,8 +263,9 @@ export class YellowSessionManager {
     this.isSessionActive = false;
     this.appSessionId = null;
     this.actionCount = 0;
+    this.actionBreakdown = {};
     this.stateVersion = 0;
-    this.initialUsdcAmount = '100000000';
+    this.initialAmount = '0';
     this.emitState();
   }
 
@@ -287,44 +279,70 @@ export class YellowSessionManager {
       sessionId: this.appSessionId ?? undefined,
       actionCount: this.actionCount,
       gasSaved: this.gasSavedTotal,
+      actionBreakdown: { ...this.actionBreakdown },
     };
+  }
+
+  /**
+   * Private: Tear down WebSocket + ping without triggering reconnect side effects
+   */
+  private cleanupConnection(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+    if (this.ws) {
+      // Detach handlers so the closing socket can't interfere with future connections
+      this.ws.onopen = null;
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.onmessage = null;
+      this.ws.close();
+      this.ws = null;
+    }
+    this.requestHandlers.clear();
   }
 
   /**
    * Private: Connect WebSocket
    */
   private connectWebSocket(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(NETWORKS.YELLOW_ENDPOINT);
+    // Ensure any stale socket is fully torn down before opening a new one
+    this.cleanupConnection();
 
-      this.ws.onopen = () => {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(NETWORKS.YELLOW_ENDPOINT);
+      this.ws = ws;
+
+      ws.onopen = () => {
         this.startPingInterval();
         resolve();
       };
 
-      this.ws.onerror = (error) => {
+      ws.onerror = () => {
         reject(new Error('WebSocket connection failed'));
       };
 
-      this.ws.onmessage = (event) => {
+      ws.onmessage = (event) => {
         this.handleMessage(event);
       };
 
-      this.ws.onclose = () => {
+      ws.onclose = () => {
+        // Only act if this is still the active socket
+        if (this.ws !== ws) return;
+
         if (this.pingInterval) {
           clearInterval(this.pingInterval);
           this.pingInterval = null;
         }
 
-        // Clear all pending request handlers to prevent closure leaks
         this.requestHandlers.clear();
-
         this.emitState();
       };
 
       // Timeout after 10 seconds
       setTimeout(() => {
-        if (this.ws?.readyState !== WebSocket.OPEN) {
+        if (ws.readyState !== WebSocket.OPEN) {
           reject(new Error('WebSocket connection timeout'));
         }
       }, 10000);
@@ -353,38 +371,43 @@ export class YellowSessionManager {
     }
 
     const userAddress = walletClient.account.address;
+    const expiresAt = BigInt(Math.floor(Date.now() / 1000) + 86400); // 24 hours
 
-    // Step 1: Send auth_request
-    const allowances: RPCAllowance[] = [{ asset: 'usdc', amount: '1000000000' }]; // 1000 USDC
-    const authRequest = await createAuthRequestMessage({
+    // Auth params — shared between auth_request and EIP-712 signer
+    // Reference: resources/nitrolite/integration/common/auth.ts
+    const authParams = {
       address: userAddress,
       session_key: this.sessionKey.address,
       application: GAME_PROTOCOL,
-      allowances,
-      expires_at: BigInt(Math.floor(Date.now() / 1000) + 86400), // 24 hours
-      scope: 'game',
-    });
+      allowances: [{ asset: this.assetSymbol, amount: '1000000000' }] as RPCAllowance[], // 1000 ytest.usd spending cap
+      expires_at: expiresAt,
+      scope: 'console',
+    };
+
+    // Step 1: Create EIP-712 signer (must use same params as auth_request)
+    // Domain name must match the application field
+    const eip712Signer = createEIP712AuthMessageSigner(
+      walletClient,
+      {
+        scope: authParams.scope,
+        session_key: authParams.session_key,
+        expires_at: authParams.expires_at,
+        allowances: authParams.allowances,
+      },
+      { name: authParams.application }
+    );
+
+    // Step 2: Send auth_request
+    const authRequest = await createAuthRequestMessage(authParams);
 
     // Auth request returns auth_challenge response (NOT auth_request)
     const rawChallengeResponse = await this.sendAndWaitRaw(authRequest, 'auth_challenge');
     const challengeResponse = parseAuthChallengeResponse(rawChallengeResponse);
 
-    // Step 2: Sign challenge with EIP-712
-    const eip712Signer = createEIP712AuthMessageSigner(
-      walletClient,
-      {
-        scope: 'game',
-        session_key: this.sessionKey.address,
-        expires_at: BigInt(Math.floor(Date.now() / 1000) + 86400),
-        allowances,
-      },
-      { name: 'Yellow' }
-    );
-
-    // Step 3: Send auth_verify
-    const authVerify = await createAuthVerifyMessageFromChallenge(
+    // Step 3: Send auth_verify with full parsed challenge response
+    const authVerify = await createAuthVerifyMessage(
       eip712Signer,
-      challengeResponse.params.challengeMessage
+      challengeResponse
     );
 
     const verifyResult = await this.sendAndWait<AuthVerifyResult>(authVerify, 'auth_verify');
@@ -393,7 +416,8 @@ export class YellowSessionManager {
       throw new Error('Authentication failed');
     }
 
-    this.jwtToken = verifyResult.jwtToken ?? null;
+    // Broker may send snake_case (jwt_token) or camelCase (jwtToken)
+    this.jwtToken = verifyResult.jwtToken ?? verifyResult.jwt_token ?? null;
     this.isAuthenticated = true;
   }
 
@@ -416,15 +440,32 @@ export class YellowSessionManager {
         reject(new Error(`Request timeout for ${expectedMethod}`));
       }, 30000); // 30 second timeout
 
-      this.requestHandlers.set(requestId, (response: RPCResponse) => {
+      this.requestHandlers.set(requestId, (response: RPCMessage) => {
         clearTimeout(timeout);
         this.requestHandlers.delete(requestId);
+
+        // Handle error responses from broker
+        if (response.err) {
+          const [, code, errMsg] = response.err;
+          reject(new Error(`Yellow Network error (${code}): ${errMsg}`));
+          return;
+        }
+
+        // Broker sometimes returns errors as res with method="error"
+        if (response.res && response.res[1] === 'error') {
+          const errorData = response.res[2];
+          const errMsg = typeof errorData === 'string' ? errorData
+            : errorData?.message ?? errorData?.error ?? JSON.stringify(errorData);
+          reject(new Error(`Yellow Network error: ${errMsg}`));
+          return;
+        }
 
         if (response.res && response.res[1] === expectedMethod) {
           // Return raw response string for SDK parsers
           resolve(JSON.stringify(response));
         } else {
-          reject(new Error(`Unexpected response for ${expectedMethod}`));
+          const actualMethod = response.res?.[1] ?? 'unknown';
+          reject(new Error(`Unexpected response for ${expectedMethod}: got ${actualMethod}`));
         }
       });
 
@@ -434,7 +475,7 @@ export class YellowSessionManager {
   }
 
   /**
-   * Private: Send message and wait for parsed response (legacy method)
+   * Private: Send message and wait for parsed response
    */
   private sendAndWait<T = any>(message: string, expectedMethod: string): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -452,14 +493,31 @@ export class YellowSessionManager {
         reject(new Error(`Request timeout for ${expectedMethod}`));
       }, 30000); // 30 second timeout
 
-      this.requestHandlers.set(requestId, (response: RPCResponse<T>) => {
+      this.requestHandlers.set(requestId, (response: RPCMessage) => {
         clearTimeout(timeout);
         this.requestHandlers.delete(requestId);
 
+        // Handle error responses from broker
+        if (response.err) {
+          const [, code, errMsg] = response.err;
+          reject(new Error(`Yellow Network error (${code}): ${errMsg}`));
+          return;
+        }
+
+        // Broker sometimes returns errors as res with method="error"
+        if (response.res && response.res[1] === 'error') {
+          const errorData = response.res[2];
+          const errMsg = typeof errorData === 'string' ? errorData
+            : errorData?.message ?? errorData?.error ?? JSON.stringify(errorData);
+          reject(new Error(`Yellow Network error: ${errMsg}`));
+          return;
+        }
+
         if (response.res && response.res[1] === expectedMethod) {
-          resolve(response.res[2]); // Return result
+          resolve(response.res[2] as T); // Return result
         } else {
-          reject(new Error(`Unexpected response for ${expectedMethod}`));
+          const actualMethod = response.res?.[1] ?? 'unknown';
+          reject(new Error(`Unexpected response for ${expectedMethod}: got ${actualMethod}`));
         }
       });
 
@@ -470,17 +528,24 @@ export class YellowSessionManager {
 
   /**
    * Private: Handle incoming WebSocket message
+   * Dispatches both success (res) and error (err) responses by request ID
    */
   private handleMessage(event: MessageEvent): void {
     try {
-      const response: RPCResponse = JSON.parse(event.data);
+      const message: RPCMessage = JSON.parse(event.data);
 
-      if (response.res) {
-        const [requestId] = response.res;
+      // Extract request ID from either res or err
+      let requestId: number | undefined;
+      if (message.res) {
+        requestId = message.res[0];
+      } else if (message.err) {
+        requestId = message.err[0];
+      }
+
+      if (requestId !== undefined) {
         const handler = this.requestHandlers.get(requestId);
-
         if (handler) {
-          handler(response);
+          handler(message);
         }
       }
     } catch (error) {

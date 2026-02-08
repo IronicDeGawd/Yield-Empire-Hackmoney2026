@@ -36,12 +36,14 @@ interface GameUIProps {
   accruedYield?: number;
   isConnecting?: boolean;
   isSettling?: boolean;
+  connectionError?: string | null;
   onUpgrade?: (entityId: string) => void;
   onCompoundAll?: () => void;
   onSettle?: () => void;
   onDeposit?: () => void;
   onDepositToBuilding?: (entityId: string, amount: number) => void;
   onGuildContribute?: (amount: number) => void;
+  onRetryConnect?: () => void;
 }
 
 export function GameUI({
@@ -58,6 +60,8 @@ export function GameUI({
   onDeposit,
   onDepositToBuilding,
   onGuildContribute,
+  connectionError,
+  onRetryConnect,
 }: GameUIProps) {
   // Per-building deposit amount inputs
   const [depositAmounts, setDepositAmounts] = useState<Record<string, string>>({});
@@ -206,8 +210,23 @@ export function GameUI({
         </div>
       </header>
 
+      {/* Connection Error Banner */}
+      {connectionError && (
+        <div className="pointer-events-auto mt-2 mx-auto max-w-lg bg-red-900/80 border border-red-500 rounded-lg px-4 py-3 flex items-center justify-between gap-3 text-sm">
+          <span className="text-red-200">{connectionError}</span>
+          {onRetryConnect && (
+            <button
+              onClick={onRetryConnect}
+              className="shrink-0 bg-red-700 hover:bg-red-600 text-white text-xs font-bold px-3 py-1 rounded uppercase"
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Main Content Area */}
-      <div className="flex-1 flex justify-between items-end w-full mt-4">
+      <div className="flex-1 flex justify-between items-start w-full mt-4">
         {/* Left Sidebar - Building Cards */}
         <div className="flex flex-col justify-center h-full pb-20 pointer-events-auto">
           <aside className="flex flex-col gap-3 w-64">
@@ -264,9 +283,10 @@ export function GameUI({
 
                 <button
                   onClick={() => onUpgrade?.(entity.id)}
-                  className="w-full bg-yellow-600 hover:bg-yellow-500 text-xs font-bold py-1 px-2 rounded border-b-2 border-yellow-800 text-black uppercase"
+                  disabled={!session?.isSessionActive}
+                  className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-yellow-900 disabled:text-gray-500 disabled:cursor-not-allowed text-xs font-bold py-1 px-2 rounded border-b-2 border-yellow-800 disabled:border-yellow-900 text-black uppercase"
                 >
-                  [ Upgrade ]
+                  {session?.isSessionActive ? '[ Upgrade ]' : '[ Connecting… ]'}
                 </button>
               </div>
             ))}
@@ -280,7 +300,7 @@ export function GameUI({
         </div>
 
         {/* Right Bottom Info Panel */}
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto max-h-[calc(100vh-200px)] overflow-y-auto">
           <div className="bg-game-panel border-2 border-game-border rounded-xl p-4 text-white w-72 shadow-2xl">
             <div className="space-y-1 mb-4 text-sm font-mono">
               <div className="flex justify-between text-gray-300">
@@ -319,8 +339,8 @@ export function GameUI({
             {/* Compound All */}
             <button
               onClick={onCompoundAll}
-              disabled={accruedYield <= 0}
-              className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 disabled:from-yellow-800 disabled:to-yellow-900 disabled:text-gray-500 text-black font-bold py-3 px-4 rounded-lg border-b-4 border-yellow-800 active:border-b-0 active:translate-y-1 transition-all shadow-lg flex items-center justify-between uppercase"
+              disabled={accruedYield <= 0 || !session?.isSessionActive}
+              className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 disabled:from-yellow-800 disabled:to-yellow-900 disabled:text-gray-500 disabled:cursor-not-allowed text-black font-bold py-3 px-4 rounded-lg border-b-4 border-yellow-800 active:border-b-0 active:translate-y-1 transition-all shadow-lg flex items-center justify-between uppercase"
             >
               <span>[ Compound All ]</span>
               <div className="w-3 h-3 bg-white rotate-45 transform" />

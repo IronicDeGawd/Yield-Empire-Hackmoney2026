@@ -7,7 +7,8 @@
  * gas savings calculator, settle button, and real transaction results.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Zap,
@@ -58,72 +59,47 @@ interface SettlementRecord {
 }
 
 export default function SettlementPage() {
+  const router = useRouter();
   const { isConnected } = useAccount();
   const identity = usePlayerIdentity();
   const yellowSession = useYellowSession();
 
-  // Settlement history (populated from real settlements + demo data)
-  const [settlements, setSettlements] = useState<SettlementRecord[]>([
-    {
-      id: '0xabc\u2026def',
-      timestamp: Date.now() - 2 * 60 * 60 * 1000,
-      actionCount: 23,
-      gasSaved: 9.2,
-      protocols: ['Compound V3', 'Morpho Blue'],
-      status: 'completed',
-    },
-    {
-      id: '0x123\u2026456',
-      timestamp: Date.now() - 8 * 60 * 60 * 1000,
-      actionCount: 47,
-      gasSaved: 18.8,
-      protocols: ['Compound V3', 'Aave V3', 'Uniswap V3'],
-      status: 'completed',
-    },
-  ]);
+  // Route guard: redirect to landing if wallet not connected
+  useEffect(() => {
+    if (!isConnected) {
+      router.replace('/');
+    }
+  }, [isConnected, router]);
 
-  // Calculate action breakdown from gas costs
+  // Settlement history (populated from real settlements only)
+  const [settlements, setSettlements] = useState<SettlementRecord[]>([]);
+
+  // Action breakdown from real tracked data
+  const ACTION_DISPLAY: Record<string, { label: string; color: string; gasCost: number }> = {
+    UPGRADE_BUILDING: { label: 'Upgrades', color: 'text-purple-400', gasCost: GAS_COSTS.upgrade },
+    COMPOUND_YIELD: { label: 'Compounds', color: 'text-green-400', gasCost: GAS_COSTS.compound },
+    DEPOSIT_TO_PROTOCOL: { label: 'Deposits', color: 'text-yellow-400', gasCost: GAS_COSTS.deposit },
+    CONTRIBUTE_TO_GUILD: { label: 'Guild Contributions', color: 'text-pink-400', gasCost: GAS_COSTS.guildContribute },
+    CLAIM_REWARDS: { label: 'Claims', color: 'text-blue-400', gasCost: GAS_COSTS.claim },
+  };
+
   const actionBreakdown = useMemo(() => {
-    const count = yellowSession.actionCount;
-    if (count === 0) return [];
+    const breakdown = yellowSession.actionBreakdown;
+    if (!breakdown || Object.keys(breakdown).length === 0) return [];
 
-    // Simulated breakdown based on typical gameplay
-    const upgradeCount = Math.floor(count * 0.3);
-    const compoundCount = Math.floor(count * 0.25);
-    const depositCount = Math.floor(count * 0.3);
-    const guildCount = count - upgradeCount - compoundCount - depositCount;
-
-    return [
-      {
-        type: 'Upgrades',
-        count: upgradeCount,
-        gasCost: GAS_COSTS.upgrade,
-        totalSaved: upgradeCount * GAS_COSTS.upgrade,
-        color: 'text-purple-400',
-      },
-      {
-        type: 'Compounds',
-        count: compoundCount,
-        gasCost: GAS_COSTS.compound,
-        totalSaved: compoundCount * GAS_COSTS.compound,
-        color: 'text-green-400',
-      },
-      {
-        type: 'Deposits',
-        count: depositCount,
-        gasCost: GAS_COSTS.deposit,
-        totalSaved: depositCount * GAS_COSTS.deposit,
-        color: 'text-yellow-400',
-      },
-      {
-        type: 'Guild Contributions',
-        count: guildCount,
-        gasCost: GAS_COSTS.guildContribute,
-        totalSaved: guildCount * GAS_COSTS.guildContribute,
-        color: 'text-pink-400',
-      },
-    ].filter((a) => a.count > 0);
-  }, [yellowSession.actionCount]);
+    return Object.entries(breakdown)
+      .map(([type, count]) => {
+        const display = ACTION_DISPLAY[type] ?? { label: type, color: 'text-gray-400', gasCost: 0.4 };
+        return {
+          type: display.label,
+          count,
+          gasCost: display.gasCost,
+          totalSaved: count * display.gasCost,
+          color: display.color,
+        };
+      })
+      .filter((a) => a.count > 0);
+  }, [yellowSession.actionBreakdown]);
 
   // Handle settlement
   const handleSettle = async () => {
@@ -199,7 +175,7 @@ export default function SettlementPage() {
       </header>
 
       {/* Content */}
-      <main className="pt-24 px-6 pb-12">
+      <main id="main-content" className="pt-24 px-6 pb-12">
         <div className="max-w-5xl mx-auto space-y-6">
           {/* Session Status Banner */}
           <div

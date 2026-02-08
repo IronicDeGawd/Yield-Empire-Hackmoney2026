@@ -45,6 +45,7 @@ export interface YellowSessionContextValue {
   actionCount: number;
   gasSaved: number;
   sessionId: string | null;
+  actionBreakdown: Record<string, number>;
 
   // Settlement results
   lastSettlement: SettlementResult | null;
@@ -66,6 +67,7 @@ const defaultValue: YellowSessionContextValue = {
   actionCount: 0,
   gasSaved: 0,
   sessionId: null,
+  actionBreakdown: {},
   lastSettlement: null,
   connect: async () => {},
   createSession: async () => {},
@@ -170,8 +172,14 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
   const performAction = useCallback(
     async (action: GameAction, gameState: object) => {
       if (!managerRef.current || !address) {
-        setError('Session not active or wallet not connected');
+        setError('Wallet not connected');
         return;
+      }
+
+      if (!sessionStateRef.current.isSessionActive) {
+        const msg = 'Yellow Network session not ready. Please wait for connection.';
+        setError(msg);
+        throw new Error(msg);
       }
 
       setError(null);
@@ -306,6 +314,7 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
     actionCount: sessionState.actionCount,
     gasSaved: sessionState.gasSaved,
     sessionId: sessionState.sessionId ?? null,
+    actionBreakdown: sessionState.actionBreakdown ?? {},
     lastSettlement,
     connect,
     createSession,

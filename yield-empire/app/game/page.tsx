@@ -16,7 +16,9 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { PixiIsometricMap } from '@/components/game/PixiIsometricMap';
+import { useRouter } from 'next/navigation';
+import { PixiIsometricMap, HoverInfo } from '@/components/game/PixiIsometricMap';
+import { BuildingPopup } from '@/components/game/BuildingPopup';
 import { GameUI } from '@/components/game/GameUI';
 import { INITIAL_ENTITIES, INITIAL_CONNECTIONS, YIELD_MULTIPLIER_PER_LEVEL } from '@/lib/constants';
 import { GameEntity, PlayerProfile } from '@/lib/types';
@@ -41,6 +43,7 @@ function entityDailyYield(e: GameEntity): number {
 }
 
 export default function GamePage() {
+  const router = useRouter();
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
   const [entities, setEntities] = useState<GameEntity[]>(INITIAL_ENTITIES);
   const [selectedEntity, setSelectedEntity] = useState<GameEntity | null>(null);
@@ -48,9 +51,21 @@ export default function GamePage() {
   const [accruedYield, setAccruedYield] = useState(0);
   const [totalYieldEarned, setTotalYieldEarned] = useState(0);
   const [guildContributed, setGuildContributed] = useState(0);
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+
+  // Retry limit for Yellow Network auto-connect (max 4 attempts)
+  const MAX_CONNECT_ATTEMPTS = 4;
+  const connectAttemptsRef = useRef(0);
 
   // Wallet connection
   const { address, isConnected } = useAccount();
+
+  // Route guard: redirect to landing if wallet not connected
+  useEffect(() => {
+    if (!isConnected) {
+      router.replace('/');
+    }
+  }, [isConnected, router]);
   const { data: ensName } = useEnsName({ address });
   const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
 
@@ -64,14 +79,14 @@ export default function GamePage() {
   const player: PlayerProfile | undefined =
     isConnected && address
       ? {
-          address,
-          ensName: ensName ?? undefined,
-          avatar: ensAvatar ?? undefined,
-          empireLevel,
-          totalDeposited,
-          totalYield: totalYieldEarned,
-          prestigeCount: 0,
-        }
+        address,
+        ensName: ensName ?? undefined,
+        avatar: ensAvatar ?? undefined,
+        empireLevel,
+        totalDeposited,
+        totalYield: totalYieldEarned,
+        prestigeCount: 0,
+      }
       : undefined;
 
   // Handle window resize
@@ -118,15 +133,23 @@ export default function GamePage() {
     return () => clearInterval(interval);
   }, [ysSessionActive]);
 
-  // ── Auto-connect to Yellow Network ───────────────────────────────────
+  // ── Auto-connect to Yellow Network (max 4 attempts) ────────────────
 
   useEffect(() => {
-    if (isConnected && !ysConnected && !ysConnecting) {
+    if (isConnected && !ysConnected && !ysConnecting && connectAttemptsRef.current < MAX_CONNECT_ATTEMPTS) {
+      connectAttemptsRef.current++;
       ysConnect().catch((err) => {
-        console.error('Failed to connect to Yellow Network:', err);
+        console.error(`Yellow Network connect attempt ${connectAttemptsRef.current}/${MAX_CONNECT_ATTEMPTS} failed:`, err);
       });
     }
   }, [isConnected, ysConnected, ysConnecting, ysConnect]);
+
+  // Reset attempt counter on successful connection
+  useEffect(() => {
+    if (ysConnected) {
+      connectAttemptsRef.current = 0;
+    }
+  }, [ysConnected]);
 
   // Auto-create session after Yellow Network connects
   useEffect(() => {
@@ -143,6 +166,9 @@ export default function GamePage() {
   const handleDeposit = useCallback(async (entityId: string, amount: number) => {
     if (amount <= 0) return;
 
+    const entity = entitiesRef.current.find((e) => e.id === entityId);
+    if (!entity) return;
+
     // Optimistic update
     setEntities((prev) =>
       prev.map((e) => (e.id === entityId ? { ...e, deposited: e.deposited + amount } : e))
@@ -150,8 +176,8 @@ export default function GamePage() {
 
     try {
       await yellowSession.performAction(
-        { type: 'DEPOSIT_TO_PROTOCOL', protocol: entities.find((e) => e.id === entityId)!.protocol, amount },
-        { entities, timestamp: Date.now() }
+        { type: 'DEPOSIT_TO_PROTOCOL', protocol: entity.protocol, amount },
+        { entities: entitiesRef.current, timestamp: Date.now() }
       );
     } catch (err) {
       console.error('Failed to submit deposit action:', err);
@@ -159,7 +185,7 @@ export default function GamePage() {
         prev.map((e) => (e.id === entityId ? { ...e, deposited: e.deposited - amount } : e))
       );
     }
-  }, [yellowSession, entities]);
+  }, [yellowSession]);
 
   // Upgrade building
   const handleUpgrade = useCallback(async (entityId: string) => {
@@ -259,7 +285,7 @@ export default function GamePage() {
   };
 
   return (
-    <div className="w-full h-screen relative overflow-hidden select-none bg-game-bg">
+    <div id="main-content" className="w-full h-screen relative overflow-hidden select-none bg-game-bg">
       {/* Background Starfield Effect - Pre-computed positions */}
       <div className="absolute inset-0 pointer-events-none">
         {STAR_DATA.map((star, i) => (
@@ -286,6 +312,7 @@ export default function GamePage() {
           width={dimensions.width}
           height={dimensions.height}
           onEntityClick={handleEntityClick}
+          onEntityHover={setHoverInfo}
         />
       </div>
 
@@ -304,6 +331,13 @@ export default function GamePage() {
           accruedYield={accruedYield}
           isConnecting={yellowSession.isConnecting}
           isSettling={yellowSession.isSettling}
+          connectionError={yellowSession.error}
+          onRetryConnect={() => {
+            connectAttemptsRef.current = 0;
+            ysConnect().catch((err) => {
+              console.error('Retry connection failed:', err);
+            });
+          }}
           onUpgrade={handleUpgrade}
           onDeposit={() => setIsDepositOpen(true)}
           onDepositToBuilding={handleDeposit}
@@ -312,6 +346,15 @@ export default function GamePage() {
           onGuildContribute={handleGuildContribute}
         />
       </div>
+
+      {/* Building Hover Popup */}
+      {hoverInfo && (
+        <BuildingPopup
+          entity={hoverInfo.entity}
+          screenX={hoverInfo.screenX}
+          screenY={hoverInfo.screenY}
+        />
+      )}
 
       {/* Cross-chain Deposit Modal */}
       <DepositPanel

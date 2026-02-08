@@ -4,14 +4,20 @@
  * DepositPanel - Cross-chain USDC deposit panel using Circle BridgeKit.
  * Provides chain selection, amount input, fee estimation, and bridge execution
  * with step-by-step progress tracking.
+ *
+ * Persists in-flight bridge state to localStorage so interrupted transfers
+ * (e.g. during attestation wait) can be retried after page refresh.
  */
 
-import { useState } from 'react';
-import { ArrowDownUp, ChevronDown, Loader2, X, Check } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ArrowDownUp, ChevronDown, Loader2, X, Check, RotateCw } from 'lucide-react';
 import { useEvmAdapter } from '@/hooks/useEvmAdapter';
 import { useBridge, type BridgeParams } from '@/hooks/useBridge';
 import { useUsdcBalance } from '@/hooks/useUsdcBalance';
 import { useProgress, type StepKey } from '@/hooks/useProgress';
+import type { BridgeResult } from '@circle-fin/bridge-kit';
+
+const PENDING_BRIDGE_KEY = 'yield-empire:pending-bridge';
 
 const CHAINS = [
   { id: 'Ethereum_Sepolia', label: 'Sepolia' },
@@ -38,17 +44,52 @@ interface DepositPanelProps {
 
 export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
   const { evmAdapter, evmAddress } = useEvmAdapter();
-  const { bridge, estimate, isLoading, error, isEstimating, estimateData, clear } = useBridge();
+  const { bridge, retry, estimate, isLoading, error, data: bridgeResult, isEstimating, estimateData, clear } = useBridge();
   const progress = useProgress();
 
   const [fromChain, setFromChain] = useState<string>(CHAINS[0].id);
   const [toChain, setToChain] = useState<string>(CHAINS[2].id);
   const [amount, setAmount] = useState('');
+  const [hasPendingBridge, setHasPendingBridge] = useState(false);
+
+  const lastResultRef = useRef<BridgeResult | null>(null);
 
   const { balance: fromBalance, loading: balanceLoading } = useUsdcBalance(fromChain, {
     evmAdapter,
     evmAddress,
   });
+
+  // Check for pending bridge on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(PENDING_BRIDGE_KEY);
+      if (stored) {
+        const pending = JSON.parse(stored);
+        if (pending && pending.fromChain && pending.toChain) {
+          setHasPendingBridge(true);
+          setFromChain(pending.fromChain);
+          setToChain(pending.toChain);
+          setAmount(pending.amount ?? '');
+        }
+      }
+    } catch {
+      // Ignore corrupt localStorage
+    }
+  }, []);
+
+  // Persist bridge state when bridge starts; clear on completion
+  useEffect(() => {
+    if (bridgeResult) {
+      lastResultRef.current = bridgeResult;
+    }
+  }, [bridgeResult]);
+
+  useEffect(() => {
+    if (progress.currentStep === 'completed') {
+      localStorage.removeItem(PENDING_BRIDGE_KEY);
+      setHasPendingBridge(false);
+    }
+  }, [progress.currentStep]);
 
   if (!isOpen) return null;
 
@@ -79,6 +120,15 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
     const params = buildParams();
     if (!params) return;
 
+    // Persist bridge metadata for recovery
+    try {
+      localStorage.setItem(PENDING_BRIDGE_KEY, JSON.stringify({
+        fromChain, toChain, amount, startedAt: Date.now(),
+      }));
+    } catch {
+      // localStorage unavailable — continue anyway
+    }
+
     progress.reset();
     progress.setCurrentStep('approving');
     progress.addLog('Starting bridge transfer\u2026');
@@ -92,11 +142,33 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
     }
   }
 
+  async function handleRetry() {
+    const failedResult = lastResultRef.current;
+    const params = buildParams();
+    if (!failedResult || !params) {
+      progress.addLog('No failed transfer to retry. Please start a new bridge.');
+      return;
+    }
+
+    progress.reset();
+    progress.setCurrentStep('waiting-attestation');
+    progress.addLog('Retrying from last successful step\u2026');
+
+    try {
+      await retry(failedResult, params, {
+        onEvent: (evt) => progress.handleEvent(evt),
+      });
+    } catch {
+      progress.setCurrentStep('error');
+    }
+  }
+
   function handleClose() {
     if (isLoading) return;
     clear();
     progress.reset();
     setAmount('');
+    setHasPendingBridge(false);
     onClose();
   }
 
@@ -127,6 +199,29 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
             <X size={20} />
           </button>
         </div>
+
+        {/* Pending bridge recovery banner */}
+        {hasPendingBridge && !isActive && (
+          <div className="mb-4 bg-yellow-900/30 border border-yellow-600 rounded-lg p-3 text-xs text-yellow-200">
+            <div className="flex items-center gap-2 mb-1 font-bold">
+              <RotateCw size={12} />
+              Interrupted transfer detected
+            </div>
+            <p className="text-yellow-300/80">
+              A previous {fromChain.replace('_', ' ')} &rarr; {toChain.replace('_', ' ')} bridge was interrupted.
+              You can start a new bridge to complete the transfer.
+            </p>
+            <button
+              onClick={() => {
+                localStorage.removeItem(PENDING_BRIDGE_KEY);
+                setHasPendingBridge(false);
+              }}
+              className="mt-2 text-yellow-400 hover:text-yellow-300 underline text-xs"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {!isActive ? (
           <>
@@ -325,18 +420,32 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
               ))}
             </div>
 
-            {/* Done / Retry buttons */}
-            {(isDone || progress.currentStep === 'error') && (
+            {/* Done / Retry / Close buttons */}
+            {isDone && (
               <button
                 onClick={handleClose}
-                className={`w-full font-bold py-2.5 px-4 rounded-lg text-sm uppercase ${
-                  isDone
-                    ? 'bg-green-700 hover:bg-green-600 text-white border border-green-500'
-                    : 'bg-red-700 hover:bg-red-600 text-white border border-red-500'
-                }`}
+                className="w-full font-bold py-2.5 px-4 rounded-lg text-sm uppercase bg-green-700 hover:bg-green-600 text-white border border-green-500"
               >
-                {isDone ? 'Done' : 'Close'}
+                Done
               </button>
+            )}
+            {progress.currentStep === 'error' && (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRetry}
+                  disabled={isLoading || !lastResultRef.current}
+                  className="flex-1 font-bold py-2.5 px-4 rounded-lg text-sm uppercase bg-yellow-700 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed text-white border border-yellow-500 flex items-center justify-center gap-2"
+                >
+                  <RotateCw size={14} />
+                  Retry
+                </button>
+                <button
+                  onClick={handleClose}
+                  className="flex-1 font-bold py-2.5 px-4 rounded-lg text-sm uppercase bg-red-700 hover:bg-red-600 text-white border border-red-500"
+                >
+                  Close
+                </button>
+              </div>
             )}
           </>
         )}

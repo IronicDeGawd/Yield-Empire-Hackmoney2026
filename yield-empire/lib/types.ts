@@ -73,6 +73,7 @@ export interface SessionState {
   channelId?: string;
   actionCount: number;
   gasSaved: number; // Estimated gas saved in USD
+  actionBreakdown?: Record<string, number>; // action type → count
 }
 
 // Game actions that can be performed via Yellow Network
