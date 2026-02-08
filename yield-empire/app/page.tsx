@@ -62,7 +62,7 @@ export default function Home() {
       </header>
 
       {/* Hero Section */}
-      <main className="pt-24 px-6">
+      <main id="main-content" className="pt-24 px-6">
         <div className="max-w-7xl mx-auto">
           {/* Hero Content */}
           <div className="text-center py-20">

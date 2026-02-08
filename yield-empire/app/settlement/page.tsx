@@ -7,7 +7,8 @@
  * gas savings calculator, settle button, and real transaction results.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Zap,
@@ -58,9 +59,17 @@ interface SettlementRecord {
 }
 
 export default function SettlementPage() {
+  const router = useRouter();
   const { isConnected } = useAccount();
   const identity = usePlayerIdentity();
   const yellowSession = useYellowSession();
+
+  // Route guard: redirect to landing if wallet not connected
+  useEffect(() => {
+    if (!isConnected) {
+      router.replace('/');
+    }
+  }, [isConnected, router]);
 
   // Settlement history (populated from real settlements only)
   const [settlements, setSettlements] = useState<SettlementRecord[]>([]);
@@ -166,7 +175,7 @@ export default function SettlementPage() {
       </header>
 
       {/* Content */}
-      <main className="pt-24 px-6 pb-12">
+      <main id="main-content" className="pt-24 px-6 pb-12">
         <div className="max-w-5xl mx-auto space-y-6">
           {/* Session Status Banner */}
           <div

@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Trophy,
@@ -19,7 +20,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { usePublicClient } from 'wagmi';
+import { usePublicClient, useAccount } from 'wagmi';
 import { usePlayerIdentity } from '@/hooks/useENS';
 import {
   getGuildProfile,
@@ -36,8 +37,17 @@ type LeaderboardTab = 'guilds' | 'players';
 type ProtocolFilter = 'all' | 'aave' | 'compound' | 'uniswap' | 'curve';
 
 export default function LeaderboardPage() {
+  const router = useRouter();
   const publicClient = usePublicClient();
   const identity = usePlayerIdentity();
+  const { isConnected } = useAccount();
+
+  // Route guard: redirect to landing if wallet not connected
+  useEffect(() => {
+    if (!isConnected) {
+      router.replace('/');
+    }
+  }, [isConnected, router]);
 
   const [activeTab, setActiveTab] = useState<LeaderboardTab>('guilds');
   const [protocolFilter, setProtocolFilter] = useState<ProtocolFilter>('all');
@@ -149,7 +159,7 @@ export default function LeaderboardPage() {
       </header>
 
       {/* Content */}
-      <main className="pt-24 px-6 pb-12">
+      <main id="main-content" className="pt-24 px-6 pb-12">
         <div className="max-w-5xl mx-auto space-y-6">
           {/* Tab Switcher */}
           <div className="flex items-center gap-4">

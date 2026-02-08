@@ -166,6 +166,9 @@ export default function GamePage() {
   const handleDeposit = useCallback(async (entityId: string, amount: number) => {
     if (amount <= 0) return;
 
+    const entity = entitiesRef.current.find((e) => e.id === entityId);
+    if (!entity) return;
+
     // Optimistic update
     setEntities((prev) =>
       prev.map((e) => (e.id === entityId ? { ...e, deposited: e.deposited + amount } : e))
@@ -173,8 +176,8 @@ export default function GamePage() {
 
     try {
       await yellowSession.performAction(
-        { type: 'DEPOSIT_TO_PROTOCOL', protocol: entities.find((e) => e.id === entityId)!.protocol, amount },
-        { entities, timestamp: Date.now() }
+        { type: 'DEPOSIT_TO_PROTOCOL', protocol: entity.protocol, amount },
+        { entities: entitiesRef.current, timestamp: Date.now() }
       );
     } catch (err) {
       console.error('Failed to submit deposit action:', err);
@@ -182,7 +185,7 @@ export default function GamePage() {
         prev.map((e) => (e.id === entityId ? { ...e, deposited: e.deposited - amount } : e))
       );
     }
-  }, [yellowSession, entities]);
+  }, [yellowSession]);
 
   // Upgrade building
   const handleUpgrade = useCallback(async (entityId: string) => {
@@ -282,7 +285,7 @@ export default function GamePage() {
   };
 
   return (
-    <div className="w-full h-screen relative overflow-hidden select-none bg-game-bg">
+    <div id="main-content" className="w-full h-screen relative overflow-hidden select-none bg-game-bg">
       {/* Background Starfield Effect - Pre-computed positions */}
       <div className="absolute inset-0 pointer-events-none">
         {STAR_DATA.map((star, i) => (
