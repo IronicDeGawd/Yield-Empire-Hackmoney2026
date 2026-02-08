@@ -27,13 +27,9 @@ import {
 } from '@/lib/ens/guild-manager';
 import type { GuildProfile, PlayerProfile } from '@/lib/types';
 
-// Demo guild names for the hackathon leaderboard
+// Single guild for the hackathon demo (registered on Sepolia)
 const DEMO_GUILDS = [
-  'yield-warriors.eth',
-  'defi-kings.eth',
-  'alpha-seekers.eth',
-  'vault-masters.eth',
-  'chain-runners.eth',
+  'yield-empire.eth',
 ];
 
 type LeaderboardTab = 'guilds' | 'players';

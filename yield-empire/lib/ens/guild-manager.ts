@@ -207,8 +207,8 @@ export async function updateGuildStats(
 
 /**
  * Create a guild member subdomain.
- * e.g. createGuildMember(wc, 'yield-warriors.eth', 'alice', '0x...')
- *      → creates alice.yield-warriors.eth
+ * e.g. createGuildMember(wc, 'yield-empire.eth', 'alice', '0x...')
+ *      → creates alice.yield-empire.eth
  *
  * Caller must own the parent domain.
  */

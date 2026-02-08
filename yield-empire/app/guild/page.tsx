@@ -35,8 +35,8 @@ import {
 } from '@/lib/ens/guild-manager';
 import type { PlayerProfile } from '@/lib/types';
 
-// Demo guild name for the hackathon
-const DEMO_GUILD = 'yield-warriors.eth';
+// Guild name for the hackathon (registered on Sepolia)
+const DEMO_GUILD = 'yield-empire.eth';
 
 export default function GuildPage() {
   const { address, isConnected } = useAccount();
