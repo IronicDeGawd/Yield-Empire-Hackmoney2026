@@ -4,6 +4,9 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(wagmi|viem|@wagmi|@circle-fin|@erc7824)/)',
+  ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
