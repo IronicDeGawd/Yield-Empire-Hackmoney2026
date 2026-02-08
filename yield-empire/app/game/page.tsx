@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { PixiIsometricMap } from '@/components/game/PixiIsometricMap';
 import { GameUI } from '@/components/game/GameUI';
 import { INITIAL_ENTITIES, INITIAL_CONNECTIONS, YIELD_MULTIPLIER_PER_LEVEL } from '@/lib/constants';
@@ -41,6 +42,7 @@ function entityDailyYield(e: GameEntity): number {
 }
 
 export default function GamePage() {
+  const router = useRouter();
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
   const [entities, setEntities] = useState<GameEntity[]>(INITIAL_ENTITIES);
   const [selectedEntity, setSelectedEntity] = useState<GameEntity | null>(null);
@@ -51,6 +53,13 @@ export default function GamePage() {
 
   // Wallet connection
   const { address, isConnected } = useAccount();
+
+  // Route guard: redirect to landing if wallet not connected
+  useEffect(() => {
+    if (!isConnected) {
+      router.replace('/');
+    }
+  }, [isConnected, router]);
   const { data: ensName } = useEnsName({ address });
   const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
 
@@ -304,6 +313,12 @@ export default function GamePage() {
           accruedYield={accruedYield}
           isConnecting={yellowSession.isConnecting}
           isSettling={yellowSession.isSettling}
+          connectionError={yellowSession.error}
+          onRetryConnect={() => {
+            ysConnect().catch((err) => {
+              console.error('Retry connection failed:', err);
+            });
+          }}
           onUpgrade={handleUpgrade}
           onDeposit={() => setIsDepositOpen(true)}
           onDepositToBuilding={handleDeposit}
