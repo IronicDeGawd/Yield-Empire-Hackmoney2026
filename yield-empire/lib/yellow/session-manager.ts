@@ -40,17 +40,22 @@ import { NETWORKS, GAME_PROTOCOL, CHALLENGE_PERIOD } from '@/lib/config/networks
 import { GameAction, SessionState } from '@/lib/types';
 import { GAS_COSTS } from '@/lib/constants';
 
-// Yellow Network RPC response types
-interface RPCResponse<T = any> {
-  res: [number, string, T, number]; // [requestId, method, result, timestamp]
+// Yellow Network RPC message types
+// Success: { res: [requestId, method, result, timestamp], sig?: [...] }
+// Error:   { err: [requestId, errorCode, errorMessage, timestamp] }
+interface RPCMessage {
+  res?: [number, string, any, number];
+  err?: [number, number, string, number];
   sig?: string[];
 }
 
 interface AuthVerifyResult {
   address: Address;
-  sessionKey: Address;
+  sessionKey?: Address;
+  session_key?: Address;   // broker sends snake_case
   success: boolean;
   jwtToken?: string;
+  jwt_token?: string;      // broker sends snake_case
 }
 
 /**
@@ -65,6 +70,7 @@ export class YellowSessionManager {
   private stateVersion: number = 0;
   private actionCount: number = 0;
   private gasSavedTotal: number = 0;
+  private actionBreakdown: Record<string, number> = {};
   private initialUsdcAmount: string = '100000000';
   private jwtToken: string | null = null;
   private brokerAddress: Address | null = null;
@@ -240,6 +246,7 @@ export class YellowSessionManager {
     this.stateVersion = nextVersion;
     this.actionCount++;
     this.gasSavedTotal += this.getActionGasCost(action);
+    this.actionBreakdown[action.type] = (this.actionBreakdown[action.type] || 0) + 1;
     this.emitState();
   }
 
@@ -272,6 +279,7 @@ export class YellowSessionManager {
     this.isSessionActive = false;
     this.appSessionId = null;
     this.actionCount = 0;
+    this.actionBreakdown = {};
     this.stateVersion = 0;
     this.initialUsdcAmount = '100000000';
     this.emitState();
@@ -287,6 +295,7 @@ export class YellowSessionManager {
       sessionId: this.appSessionId ?? undefined,
       actionCount: this.actionCount,
       gasSaved: this.gasSavedTotal,
+      actionBreakdown: { ...this.actionBreakdown },
     };
   }
 
@@ -393,7 +402,8 @@ export class YellowSessionManager {
       throw new Error('Authentication failed');
     }
 
-    this.jwtToken = verifyResult.jwtToken ?? null;
+    // Broker may send snake_case (jwt_token) or camelCase (jwtToken)
+    this.jwtToken = verifyResult.jwtToken ?? verifyResult.jwt_token ?? null;
     this.isAuthenticated = true;
   }
 
@@ -416,15 +426,23 @@ export class YellowSessionManager {
         reject(new Error(`Request timeout for ${expectedMethod}`));
       }, 30000); // 30 second timeout
 
-      this.requestHandlers.set(requestId, (response: RPCResponse) => {
+      this.requestHandlers.set(requestId, (response: RPCMessage) => {
         clearTimeout(timeout);
         this.requestHandlers.delete(requestId);
+
+        // Handle error responses from broker
+        if (response.err) {
+          const [, code, errMsg] = response.err;
+          reject(new Error(`Yellow Network error (${code}): ${errMsg}`));
+          return;
+        }
 
         if (response.res && response.res[1] === expectedMethod) {
           // Return raw response string for SDK parsers
           resolve(JSON.stringify(response));
         } else {
-          reject(new Error(`Unexpected response for ${expectedMethod}`));
+          const actualMethod = response.res?.[1] ?? 'unknown';
+          reject(new Error(`Unexpected response for ${expectedMethod}: got ${actualMethod}`));
         }
       });
 
@@ -434,7 +452,7 @@ export class YellowSessionManager {
   }
 
   /**
-   * Private: Send message and wait for parsed response (legacy method)
+   * Private: Send message and wait for parsed response
    */
   private sendAndWait<T = any>(message: string, expectedMethod: string): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -452,14 +470,22 @@ export class YellowSessionManager {
         reject(new Error(`Request timeout for ${expectedMethod}`));
       }, 30000); // 30 second timeout
 
-      this.requestHandlers.set(requestId, (response: RPCResponse<T>) => {
+      this.requestHandlers.set(requestId, (response: RPCMessage) => {
         clearTimeout(timeout);
         this.requestHandlers.delete(requestId);
 
+        // Handle error responses from broker
+        if (response.err) {
+          const [, code, errMsg] = response.err;
+          reject(new Error(`Yellow Network error (${code}): ${errMsg}`));
+          return;
+        }
+
         if (response.res && response.res[1] === expectedMethod) {
-          resolve(response.res[2]); // Return result
+          resolve(response.res[2] as T); // Return result
         } else {
-          reject(new Error(`Unexpected response for ${expectedMethod}`));
+          const actualMethod = response.res?.[1] ?? 'unknown';
+          reject(new Error(`Unexpected response for ${expectedMethod}: got ${actualMethod}`));
         }
       });
 
@@ -470,17 +496,24 @@ export class YellowSessionManager {
 
   /**
    * Private: Handle incoming WebSocket message
+   * Dispatches both success (res) and error (err) responses by request ID
    */
   private handleMessage(event: MessageEvent): void {
     try {
-      const response: RPCResponse = JSON.parse(event.data);
+      const message: RPCMessage = JSON.parse(event.data);
 
-      if (response.res) {
-        const [requestId] = response.res;
+      // Extract request ID from either res or err
+      let requestId: number | undefined;
+      if (message.res) {
+        requestId = message.res[0];
+      } else if (message.err) {
+        requestId = message.err[0];
+      }
+
+      if (requestId !== undefined) {
         const handler = this.requestHandlers.get(requestId);
-
         if (handler) {
-          handler(response);
+          handler(message);
         }
       }
     } catch (error) {
