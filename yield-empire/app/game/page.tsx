@@ -20,12 +20,14 @@ import { useRouter } from 'next/navigation';
 import { PixiIsometricMap, HoverInfo } from '@/components/game/PixiIsometricMap';
 import { BuildingPopup } from '@/components/game/BuildingPopup';
 import { GameUI } from '@/components/game/GameUI';
-import { INITIAL_ENTITIES, INITIAL_CONNECTIONS, YIELD_MULTIPLIER_PER_LEVEL } from '@/lib/constants';
+import { SettleConfirmDialog } from '@/components/game/SettleConfirmDialog';
+import { INITIAL_ENTITIES, INITIAL_CONNECTIONS, YIELD_MULTIPLIER_PER_LEVEL, getUpgradeCost } from '@/lib/constants';
 import { GameEntity, PlayerProfile } from '@/lib/types';
 import { useAccount } from 'wagmi';
 import { useEnsName, useEnsAvatar } from 'wagmi';
 import { STAR_DATA } from '@/components/game/pixi/effects/Starfield';
 import { useYellowSession } from '@/hooks/useYellowSession';
+import { useProtocolRates } from '@/hooks/useProtocolRates';
 import { DepositPanel } from '@/components/game/DepositPanel';
 
 /** Calculate empire level from total deposited and action count */
@@ -71,6 +73,25 @@ export default function GamePage() {
 
   // Yellow Network session
   const yellowSession = useYellowSession();
+
+  // Live protocol APY rates
+  const { rates: protocolRates } = useProtocolRates();
+
+  // Sync live rates into entities when rates change
+  useEffect(() => {
+    setEntities((prev) => {
+      let changed = false;
+      const updated = prev.map((e) => {
+        const rate = protocolRates[e.protocol];
+        if (rate && (e.yieldRate !== rate.apy || e.rateSource !== rate.source)) {
+          changed = true;
+          return { ...e, yieldRate: rate.apy, rateSource: rate.source };
+        }
+        return e;
+      });
+      return changed ? updated : prev;
+    });
+  }, [protocolRates]);
 
   // Player profile — empire level is dynamic based on deposits + actions
   const totalDeposited = entities.reduce((sum, e) => sum + e.deposited, 0);
@@ -187,8 +208,16 @@ export default function GamePage() {
     }
   }, [yellowSession]);
 
-  // Upgrade building
+  // Upgrade building (costs accrued yield)
   const handleUpgrade = useCallback(async (entityId: string) => {
+    const entity = entitiesRef.current.find((e) => e.id === entityId);
+    if (!entity) return;
+
+    const cost = getUpgradeCost(entity.level);
+    if (accruedYield < cost) return;
+
+    // Deduct upgrade cost from accrued yield
+    setAccruedYield((prev) => prev - cost);
     setEntities((prev) =>
       prev.map((e) => (e.id === entityId ? { ...e, level: e.level + 1 } : e))
     );
@@ -200,11 +229,13 @@ export default function GamePage() {
       );
     } catch (err) {
       console.error('Failed to submit upgrade action:', err);
+      // Revert both level and yield cost
+      setAccruedYield((prev) => prev + cost);
       setEntities((prev) =>
         prev.map((e) => (e.id === entityId ? { ...e, level: e.level - 1 } : e))
       );
     }
-  }, [yellowSession, entities]);
+  }, [yellowSession, entities, accruedYield]);
 
   // Compound all — reinvest accrued yield across buildings proportionally
   const handleCompoundAll = useCallback(async () => {
@@ -264,18 +295,20 @@ export default function GamePage() {
   }, [yellowSession, entities, accruedYield, guildContributed]);
 
   // Settlement — passes entities for real protocol execution
-  const handleSettle = useCallback(async () => {
-    const confirmed = confirm(
-      `Settle ${yellowSession.actionCount} actions?\nEstimated gas saved: $${yellowSession.gasSaved.toFixed(2)}`
-    );
+  const [isSettleConfirmOpen, setIsSettleConfirmOpen] = useState(false);
 
-    if (confirmed) {
-      try {
-        await yellowSession.settleSession(entities);
-      } catch (err) {
-        console.error('Settlement failed:', err);
-        alert('Settlement failed. Please try again.');
-      }
+  const handleSettle = useCallback(() => {
+    if (totalDeposited === 0) return;
+    setIsSettleConfirmOpen(true);
+  }, [totalDeposited]);
+
+  const handleSettleConfirmed = useCallback(async () => {
+    setIsSettleConfirmOpen(false);
+    try {
+      await yellowSession.settleSession(entities);
+    } catch (err) {
+      console.error('Settlement failed:', err);
+      alert('Settlement failed. Please try again.');
     }
   }, [yellowSession, entities]);
 
@@ -360,6 +393,16 @@ export default function GamePage() {
       <DepositPanel
         isOpen={isDepositOpen}
         onClose={() => setIsDepositOpen(false)}
+      />
+
+      {/* Settlement Confirmation Dialog */}
+      <SettleConfirmDialog
+        isOpen={isSettleConfirmOpen}
+        entities={entities}
+        actionCount={yellowSession.actionCount}
+        gasSaved={yellowSession.gasSaved}
+        onConfirm={handleSettleConfirmed}
+        onCancel={() => setIsSettleConfirmOpen(false)}
       />
     </div>
   );

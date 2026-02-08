@@ -62,7 +62,12 @@ export function BuildingPopup({ entity, screenX, screenY }: BuildingPopupProps) 
 
                     <div className="flex justify-between items-center">
                         <span className="text-purple-400">APY:</span>
-                        <span className="text-green-400 font-bold">{effectiveAPY.toFixed(1)}%</span>
+                        <span className="text-green-400 font-bold">
+                            {effectiveAPY.toFixed(1)}%
+                            {entity.rateSource === 'live' && <span className="text-[8px] text-green-300 ml-1">LIVE</span>}
+                            {entity.rateSource === 'estimated' && <span className="text-[8px] text-yellow-300 ml-1">EST</span>}
+                            {entity.rateSource === 'simulated' && <span className="text-[8px] text-gray-400 ml-1">SIM</span>}
+                        </span>
                     </div>
 
                     <div className="flex justify-between items-center">

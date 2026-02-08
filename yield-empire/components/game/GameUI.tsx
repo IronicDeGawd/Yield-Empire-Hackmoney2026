@@ -26,6 +26,7 @@ import {
   User,
 } from 'lucide-react';
 import { GameEntity, PlayerProfile, GuildProfile, SessionState } from '@/lib/types';
+import { getUpgradeCost } from '@/lib/constants';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 interface GameUIProps {
@@ -194,7 +195,7 @@ export function GameUI({
           {session?.isSessionActive && (
             <button
               onClick={onSettle}
-              disabled={isSettling}
+              disabled={isSettling || totalTVL === 0}
               className="bg-yellow-500 hover:bg-yellow-400 disabled:bg-yellow-700 disabled:cursor-not-allowed text-black font-bold py-2 px-6 rounded-lg border-b-4 border-yellow-700 active:border-b-0 active:translate-y-1 transition-all shadow-lg uppercase tracking-wider flex items-center gap-2"
             >
               {isSettling ? (
@@ -202,6 +203,8 @@ export function GameUI({
                   <Loader2 size={16} className="animate-spin" />
                   Settling\u2026
                 </>
+              ) : totalTVL === 0 ? (
+                '[ No Deposits ]'
               ) : (
                 '[ Settle ]'
               )}
@@ -254,7 +257,11 @@ export function GameUI({
                   </div>
                 </div>
                 <div className="text-sm text-gray-300 mb-2 pl-8">
-                  {(entity.yieldRate * (1 + entity.level * 0.1)).toFixed(1)}% APY &middot; ${entity.deposited.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  {(entity.yieldRate * (1 + entity.level * 0.1)).toFixed(1)}% APY
+                  {entity.rateSource === 'live' && <span className="text-[10px] text-green-400 ml-1">[LIVE]</span>}
+                  {entity.rateSource === 'estimated' && <span className="text-[10px] text-yellow-400 ml-1">[EST]</span>}
+                  {entity.rateSource === 'simulated' && <span className="text-[10px] text-gray-400 ml-1">[SIM]</span>}
+                  {' '}&middot; ${entity.deposited.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </div>
 
                 {/* Deposit to building input */}
@@ -283,10 +290,13 @@ export function GameUI({
 
                 <button
                   onClick={() => onUpgrade?.(entity.id)}
-                  disabled={!session?.isSessionActive}
+                  disabled={!session?.isSessionActive || accruedYield < getUpgradeCost(entity.level)}
                   className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-yellow-900 disabled:text-gray-500 disabled:cursor-not-allowed text-xs font-bold py-1 px-2 rounded border-b-2 border-yellow-800 disabled:border-yellow-900 text-black uppercase"
+                  title={accruedYield < getUpgradeCost(entity.level) ? `Requires $${getUpgradeCost(entity.level).toFixed(2)} accrued yield` : undefined}
                 >
-                  {session?.isSessionActive ? '[ Upgrade ]' : '[ Connecting… ]'}
+                  {!session?.isSessionActive
+                    ? '[ Connecting… ]'
+                    : `[ Upgrade · $${getUpgradeCost(entity.level).toFixed(2)} ]`}
                 </button>
               </div>
             ))}
