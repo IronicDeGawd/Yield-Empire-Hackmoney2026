@@ -10,6 +10,35 @@ import { sepolia } from 'wagmi/chains';
 import { PROTOCOL_ADDRESSES } from './addresses';
 import { COMPOUND_COMET_ABI, ERC20_ABI } from './abis';
 
+const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
+
+/**
+ * Fetch Compound V3 supply APY from on-chain rate data.
+ * Gets current utilization, then queries supply rate at that utilization.
+ * Supply rate is per-second, scaled by 1e18.
+ */
+export async function getCompoundSupplyAPY(
+  publicClient: PublicClient,
+): Promise<number> {
+  const utilization = await publicClient.readContract({
+    address: COMPOUND.COMET_USDC,
+    abi: COMPOUND_COMET_ABI,
+    functionName: 'getUtilization',
+  });
+
+  const supplyRate = await publicClient.readContract({
+    address: COMPOUND.COMET_USDC,
+    abi: COMPOUND_COMET_ABI,
+    functionName: 'getSupplyRate',
+    args: [utilization as bigint],
+  });
+
+  // supplyRate is per-second, 18 decimals
+  // APY ≈ supplyRate * secondsPerYear / 1e18 * 100
+  const apy = (Number(supplyRate) * SECONDS_PER_YEAR) / 1e18 * 100;
+  return apy;
+}
+
 const { COMPOUND, CIRCLE_USDC } = PROTOCOL_ADDRESSES;
 
 /**

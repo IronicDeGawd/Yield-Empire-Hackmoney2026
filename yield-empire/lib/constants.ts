@@ -133,6 +133,14 @@ export const INITIAL_CONNECTIONS: Connection[] = [
 // Upgrade cost multiplier per level
 export const UPGRADE_COST_MULTIPLIER = 1.15;
 
+// Base cost (in USDC from accrued yield) for first upgrade
+export const BASE_UPGRADE_COST = 5;
+
+/** Calculate upgrade cost for a building at the given level */
+export function getUpgradeCost(currentLevel: number): number {
+  return BASE_UPGRADE_COST * Math.pow(UPGRADE_COST_MULTIPLIER, currentLevel - 1);
+}
+
 // Yield multiplier per level (+10%)
 export const YIELD_MULTIPLIER_PER_LEVEL = 0.1;
 

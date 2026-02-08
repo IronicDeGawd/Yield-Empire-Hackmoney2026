@@ -15,6 +15,29 @@ import { baseSepolia } from 'wagmi/chains';
 import { PROTOCOL_ADDRESSES } from './addresses';
 import { AAVE_POOL_ABI, AAVE_FAUCET_ABI, ERC20_ABI, TREASURY_ABI } from './abis';
 
+/**
+ * Fetch Aave V3 supply APY from on-chain reserve data.
+ * Uses getReserveData() which returns currentLiquidityRate in RAY (27 decimals).
+ */
+export async function getAaveSupplyAPY(
+  publicClient: PublicClient,
+): Promise<number> {
+  const reserveData = await publicClient.readContract({
+    address: AAVE.POOL,
+    abi: AAVE_POOL_ABI,
+    functionName: 'getReserveData',
+    args: [AAVE.USDC],
+  });
+
+  // currentLiquidityRate is at index 2 of the returned struct, in RAY (1e27)
+  const currentLiquidityRate = (reserveData as { currentLiquidityRate: bigint }).currentLiquidityRate;
+  const RAY = BigInt(10) ** BigInt(27);
+
+  // Convert RAY to percentage: (rate / 1e27) * 100
+  const apyBps = Number((currentLiquidityRate * BigInt(10000)) / RAY);
+  return apyBps / 100; // e.g. 3.45 for 3.45%
+}
+
 const { AAVE, TREASURY } = PROTOCOL_ADDRESSES;
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
