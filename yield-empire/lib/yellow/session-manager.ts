@@ -8,7 +8,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import {
   // Auth functions
   createAuthRequestMessage,
-  createAuthVerifyMessageFromChallenge,
+  createAuthVerifyMessage,
   createAuthVerifyMessageWithJWT,
 
   // App session functions
@@ -71,7 +71,8 @@ export class YellowSessionManager {
   private actionCount: number = 0;
   private gasSavedTotal: number = 0;
   private actionBreakdown: Record<string, number> = {};
-  private initialUsdcAmount: string = '100000000';
+  private initialAmount: string = '0'; // zero-deposit session (no custody deposit needed for demo)
+  private assetSymbol: string = 'ytest.usd'; // broker's supported asset symbol
   private jwtToken: string | null = null;
   private brokerAddress: Address | null = null;
 
@@ -148,17 +149,17 @@ export class YellowSessionManager {
    */
   async createGameSession(
     userAddress: Address,
-    initialUsdcAmount: string = '100000000' // 100 USDC (6 decimals)
+    initialAmount: string = '0' // zero-deposit for demo
   ): Promise<Hex> {
     if (!this.sessionSigner || !this.brokerAddress) {
       throw new Error('Not authenticated');
     }
 
-    this.initialUsdcAmount = initialUsdcAmount;
+    this.initialAmount = initialAmount;
 
     const allocations: RPCAppSessionAllocation[] = [
-      { participant: userAddress, asset: 'usdc', amount: this.initialUsdcAmount },
-      { participant: this.brokerAddress, asset: 'usdc', amount: '0' },
+      { participant: userAddress, asset: this.assetSymbol, amount: this.initialAmount },
+      { participant: this.brokerAddress, asset: this.assetSymbol, amount: '0' },
     ];
 
     const message = await createAppSessionMessage(
@@ -204,8 +205,8 @@ export class YellowSessionManager {
 
     // Allocations must include ALL participants and maintain total balance
     const allocations: RPCAppSessionAllocation[] = [
-      { participant: userAddress, asset: 'usdc', amount: this.initialUsdcAmount },
-      { participant: this.brokerAddress, asset: 'usdc', amount: '0' },
+      { participant: userAddress, asset: this.assetSymbol, amount: this.initialAmount },
+      { participant: this.brokerAddress, asset: this.assetSymbol, amount: '0' },
     ];
 
     const message = await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_4>(
@@ -244,8 +245,8 @@ export class YellowSessionManager {
     // close_app_session requires final allocations for ALL participants
     // If no allocations provided, default returns all funds to user
     const allocations = finalAllocations.length > 0 ? finalAllocations : [
-      { participant: userAddress, asset: 'usdc', amount: this.initialUsdcAmount },
-      { participant: this.brokerAddress, asset: 'usdc', amount: '0' },
+      { participant: userAddress, asset: this.assetSymbol, amount: this.initialAmount },
+      { participant: this.brokerAddress, asset: this.assetSymbol, amount: '0' },
     ];
 
     const message = await createCloseAppSessionMessage(this.sessionSigner, {
@@ -264,7 +265,7 @@ export class YellowSessionManager {
     this.actionCount = 0;
     this.actionBreakdown = {};
     this.stateVersion = 0;
-    this.initialUsdcAmount = '100000000';
+    this.initialAmount = '0';
     this.emitState();
   }
 
@@ -370,38 +371,43 @@ export class YellowSessionManager {
     }
 
     const userAddress = walletClient.account.address;
+    const expiresAt = BigInt(Math.floor(Date.now() / 1000) + 86400); // 24 hours
 
-    // Step 1: Send auth_request
-    const allowances: RPCAllowance[] = [{ asset: 'usdc', amount: '1000000000' }]; // 1000 USDC
-    const authRequest = await createAuthRequestMessage({
+    // Auth params — shared between auth_request and EIP-712 signer
+    // Reference: resources/nitrolite/integration/common/auth.ts
+    const authParams = {
       address: userAddress,
       session_key: this.sessionKey.address,
       application: GAME_PROTOCOL,
-      allowances,
-      expires_at: BigInt(Math.floor(Date.now() / 1000) + 86400), // 24 hours
-      scope: 'game',
-    });
+      allowances: [{ asset: this.assetSymbol, amount: '1000000000' }] as RPCAllowance[], // 1000 ytest.usd spending cap
+      expires_at: expiresAt,
+      scope: 'console',
+    };
+
+    // Step 1: Create EIP-712 signer (must use same params as auth_request)
+    // Domain name must match the application field
+    const eip712Signer = createEIP712AuthMessageSigner(
+      walletClient,
+      {
+        scope: authParams.scope,
+        session_key: authParams.session_key,
+        expires_at: authParams.expires_at,
+        allowances: authParams.allowances,
+      },
+      { name: authParams.application }
+    );
+
+    // Step 2: Send auth_request
+    const authRequest = await createAuthRequestMessage(authParams);
 
     // Auth request returns auth_challenge response (NOT auth_request)
     const rawChallengeResponse = await this.sendAndWaitRaw(authRequest, 'auth_challenge');
     const challengeResponse = parseAuthChallengeResponse(rawChallengeResponse);
 
-    // Step 2: Sign challenge with EIP-712
-    const eip712Signer = createEIP712AuthMessageSigner(
-      walletClient,
-      {
-        scope: 'game',
-        session_key: this.sessionKey.address,
-        expires_at: BigInt(Math.floor(Date.now() / 1000) + 86400),
-        allowances,
-      },
-      { name: 'Yellow' }
-    );
-
-    // Step 3: Send auth_verify
-    const authVerify = await createAuthVerifyMessageFromChallenge(
+    // Step 3: Send auth_verify with full parsed challenge response
+    const authVerify = await createAuthVerifyMessage(
       eip712Signer,
-      challengeResponse.params.challengeMessage
+      challengeResponse
     );
 
     const verifyResult = await this.sendAndWait<AuthVerifyResult>(authVerify, 'auth_verify');
