@@ -177,8 +177,9 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
       }
 
       if (!sessionStateRef.current.isSessionActive) {
-        setError('Yellow Network session not ready. Please wait for connection.');
-        return;
+        const msg = 'Yellow Network session not ready. Please wait for connection.';
+        setError(msg);
+        throw new Error(msg);
       }
 
       setError(null);
