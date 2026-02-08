@@ -72,27 +72,6 @@ function IsometricScene({
     return map;
   }, [entities, origin]);
 
-  // Tick animation — accumulate time and redraw effects layer
-  useTick((ticker) => {
-    timeRef.current += ticker.deltaTime / 60;
-    const g = effectsRef.current;
-    if (!g) return;
-
-    g.clear();
-
-    sortedEntities.forEach((entity) => {
-      const pos = gridToScreen(entity.position.x, entity.position.y, origin);
-
-      if (entity.type === 'factory') {
-        drawSmokeParticles(g, pos.x, pos.y + 18, timeRef.current);
-      }
-
-      if (entity.type === 'crystal') {
-        drawCrystalGlow(g, pos.x, pos.y, entity.color, timeRef.current);
-      }
-    });
-  });
-
   const isTopLeftBridge = useCallback((fromId: string, toId: string) => {
     const key = [fromId, toId].sort().join('-');
     return key === 'e1-e2' || key === 'e3-e4';
