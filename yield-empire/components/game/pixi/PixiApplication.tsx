@@ -6,25 +6,36 @@
  */
 
 import { Application, extend } from '@pixi/react';
-import { Container, Graphics } from 'pixi.js';
-import { useEffect, useState, type ReactNode } from 'react';
+import { Application as PixiApp, Container, Graphics, Sprite } from 'pixi.js';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 // Register PixiJS components for JSX usage
-extend({ Container, Graphics });
+extend({ Container, Graphics, Sprite });
 
 interface PixiApplicationProps {
   width: number;
   height: number;
   children: ReactNode;
+  onInit?: (app: PixiApp) => void;
 }
 
-export function PixiApplication({ width, height, children }: PixiApplicationProps) {
+export function PixiApplication({ width, height, children, onInit }: PixiApplicationProps) {
   const [mounted, setMounted] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // SSR guard - PixiJS requires browser APIs (canvas, WebGL)
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleInit = useCallback(
+    (app: PixiApp) => {
+      app.renderer.background.alpha = 0;
+      app.renderer.background.color = 0x000000;
+      onInit?.(app);
+    },
+    [onInit]
+  );
 
   if (!mounted) {
     return (
@@ -38,16 +49,20 @@ export function PixiApplication({ width, height, children }: PixiApplicationProp
   }
 
   return (
-    <Application
-      width={width}
-      height={height}
-      backgroundAlpha={0} // Transparent background to show HTML effects behind
-      antialias={false} // Pixel-perfect rendering
-      resolution={1}
-      autoDensity={true}
-    >
-      {children}
-    </Application>
+    <div ref={containerRef} style={{ width, height }}>
+      <Application
+        className="pixi-canvas"
+        resizeTo={containerRef}
+        backgroundAlpha={0}
+        backgroundColor={0x000000}
+        antialias={false}
+        resolution={1}
+        autoDensity={true}
+        onInit={handleInit}
+      >
+        {children}
+      </Application>
+    </div>
   );
 }
 

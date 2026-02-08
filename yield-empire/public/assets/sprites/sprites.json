@@ -1,0 +1,100 @@
+{
+  "meta": {
+    "app": "asset-consolidator",
+    "version": "1.0",
+    "description": "Combined sprite manifest for Yield Empire",
+    "totalAssets": 10
+  },
+  "spritesheets": [
+    {
+      "name": "building1",
+      "json": "building1.json",
+      "image": "building1.png",
+      "size": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    {
+      "name": "building2",
+      "json": "building2.json",
+      "image": "building2.png",
+      "size": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    {
+      "name": "cloud1",
+      "json": "cloud1.json",
+      "image": "cloud1.png",
+      "size": {
+        "w": 64,
+        "h": 40
+      }
+    },
+    {
+      "name": "cloud2",
+      "json": "cloud2.json",
+      "image": "cloud2.png",
+      "size": {
+        "w": 64,
+        "h": 40
+      }
+    },
+    {
+      "name": "cloud3",
+      "json": "cloud3.json",
+      "image": "cloud3.png",
+      "size": {
+        "w": 64,
+        "h": 40
+      }
+    },
+    {
+      "name": "island",
+      "json": "island.json",
+      "image": "island.png",
+      "size": {
+        "w": 64,
+        "h": 56
+      }
+    },
+    {
+      "name": "shard-building",
+      "json": "shard-building.json",
+      "image": "shard-building.png",
+      "size": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    {
+      "name": "stairs-topleft",
+      "json": "stairs-topleft.json",
+      "image": "stairs-topleft.png",
+      "size": {
+        "w": 64,
+        "h": 48
+      }
+    },
+    {
+      "name": "stairs-topright",
+      "json": "stairs-topright.json",
+      "image": "stairs-topright.png",
+      "size": {
+        "w": 64,
+        "h": 48
+      }
+    },
+    {
+      "name": "treasury-building",
+      "json": "treasury-building.json",
+      "image": "treasury-building.png",
+      "size": {
+        "w": 64,
+        "h": 64
+      }
+    }
+  ]
+}

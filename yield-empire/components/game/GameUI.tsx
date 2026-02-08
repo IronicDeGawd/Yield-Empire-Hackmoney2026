@@ -70,6 +70,17 @@ export function GameUI({
     0,
   );
 
+  const getEntityIconSrc = (entity: GameEntity) => {
+    if (entity.type === 'crystal') return '/assets/sprites/shard-building.png';
+    if (entity.type === 'bank') return '/assets/sprites/treasury-building.png';
+    if (entity.type === 'factory') {
+      return entity.protocol === 'uniswap'
+        ? '/assets/sprites/building1.png'
+        : '/assets/sprites/building2.png';
+    }
+    return '/assets/sprites/building1.png';
+  };
+
   const handleBuildingDeposit = (entityId: string) => {
     const amount = parseFloat(depositAmounts[entityId] || '0');
     if (amount > 0 && onDepositToBuilding) {
@@ -207,10 +218,16 @@ export function GameUI({
               >
                 <div className="flex justify-between items-start mb-1">
                   <div className="flex items-center gap-2">
-                    <div
-                      className="w-6 h-6 rounded border border-white/30"
-                      style={{ backgroundColor: entity.color }}
-                    />
+                    <div className="w-6 h-6 rounded border border-white/30 bg-purple-900/30 flex items-center justify-center overflow-hidden">
+                      <img
+                        src={getEntityIconSrc(entity)}
+                        alt={`${entity.name} icon`}
+                        width={24}
+                        height={24}
+                        className="w-5 h-5 object-contain"
+                        style={{ imageRendering: 'pixelated' }}
+                      />
+                    </div>
                     <div>
                       <div className="font-bold uppercase leading-none">{entity.name}</div>
                       <div className="text-xs text-purple-300">Lv{entity.level}</div>

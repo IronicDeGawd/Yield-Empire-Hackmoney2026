@@ -14,6 +14,7 @@
     "@circle-fin/bridge-kit": "^1.5.0",
     "@ensdomains/content-hash": "^3.0.0",
     "@erc7824/nitrolite": "^0.5.3",
+    "@metamask/sdk": "^0.34.0",
     "@pixi/react": "^8.0.5",
     "@rainbow-me/rainbowkit": "^2.2.10",
     "@tanstack/react-query": "^5.90.20",

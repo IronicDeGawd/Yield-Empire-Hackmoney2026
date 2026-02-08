@@ -22,7 +22,7 @@ import { INITIAL_ENTITIES, INITIAL_CONNECTIONS, YIELD_MULTIPLIER_PER_LEVEL } fro
 import { GameEntity, PlayerProfile } from '@/lib/types';
 import { useAccount } from 'wagmi';
 import { useEnsName, useEnsAvatar } from 'wagmi';
-import { STAR_DATA, CLOUD_DATA } from '@/components/game/pixi/effects/Starfield';
+import { STAR_DATA } from '@/components/game/pixi/effects/Starfield';
 import { useYellowSession } from '@/hooks/useYellowSession';
 import { DepositPanel } from '@/components/game/DepositPanel';
 
@@ -275,22 +275,11 @@ export default function GamePage() {
             }}
           />
         ))}
-        {CLOUD_DATA.map((cloud, i) => (
-          <div
-            key={`cloud-${i}`}
-            className="absolute bg-purple-300/10 blur-xl rounded-full"
-            style={{
-              top: `${cloud.y * 100}%`,
-              left: `${cloud.x * 100}%`,
-              width: `${cloud.width}px`,
-              height: `${cloud.height}px`,
-            }}
-          />
-        ))}
+        {/* Cloud sprites now rendered in Pixi layer */}
       </div>
 
       {/* PixiJS Isometric Game Layer */}
-      <div className="absolute inset-0 flex items-center justify-center z-10 transform translate-y-20 scale-110">
+      <div className="absolute inset-0 flex items-center justify-center z-10">
         <PixiIsometricMap
           entities={entities}
           connections={INITIAL_CONNECTIONS}
