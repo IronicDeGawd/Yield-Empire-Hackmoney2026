@@ -34,6 +34,39 @@ The frontend is a Next.js 16 app in `yield-empire/` with a PixiJS isometric map 
 - **Identity layer:** ENS names and text records store player and guild stats.
 - **Bridge layer:** Circle BridgeKit transfers USDC across testnets.
 
+## Architecture Diagram
+```mermaid
+flowchart LR
+  U[Player Wallet] -->|Connect| FE[Next.js Game Client<br/>PixiJS + React UI]
+
+  subgraph Offchain["Off-chain Gameplay"]
+    FE -->|EIP-712 auth + app session| YN[Yellow Network<br/>Nitrolite ClearNode]
+    FE -->|State updates| YN
+  end
+
+  subgraph Identity["Identity & Social"]
+    FE -->|Read/Write ENS text records| ENS[ENS Registry + Resolver<br/>Sepolia]
+    FE -->|Guild members| ENSSG[ENS Subgraph]
+  end
+
+  subgraph Bridge["Cross-chain USDC"]
+    FE -->|Bridge USDC| BK[Circle BridgeKit]
+    BK -->|CCTP mint/burn| ARC[Arc Testnet]
+    BK -->|CCTP mint/burn| SEP[Sepolia]
+    BK -->|CCTP mint/burn| BASE[Base Sepolia]
+  end
+
+  subgraph Settlement["On-chain Settlement"]
+    FE -->|Close session + batch txs| SETTLE[Settlement Orchestrator]
+    SETTLE -->|Compound V3 supply| COMP[Compound V3<br/>Sepolia]
+    SETTLE -->|Morpho Blue supply| MORPHO[Morpho Blue<br/>Sepolia]
+    SETTLE -->|Uniswap swap| UNI[Uniswap V3<br/>Sepolia]
+    SETTLE -->|Mint rewards| EMPIRE[$EMPIRE ERC-20<br/>Sepolia]
+    SETTLE -->|Aave supply via treasury| TREAS[Yields Treasury<br/>Base Sepolia]
+    TREAS -->|Aave V3 supply| AAVE[Aave V3<br/>Base Sepolia]
+  end
+```
+
 ## Project Structure
 - `yield-empire/` Next.js app (frontend + game logic)
 - `contracts/` Hardhat project (Treasury on Base Sepolia + EmpireToken on Sepolia)
