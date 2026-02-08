@@ -44,7 +44,7 @@ export interface PlayerProfile {
   avatar?: string;
   empireLevel: number;
   totalDeposited: number;
-  totalYield: number;
+  totalEmpireEarned: number;
   prestigeCount: number;
   guildName?: string;
 }

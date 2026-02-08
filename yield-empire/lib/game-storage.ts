@@ -1,7 +1,7 @@
 /**
  * Game state persistence via localStorage.
  *
- * Saves/restores building deposits, levels, accrued yield, and guild
+ * Saves/restores building deposits, levels, $EMPIRE tokens, and guild
  * contributions so progress survives page refreshes.
  *
  * Keys are scoped per wallet address to support multiple accounts.
@@ -13,8 +13,8 @@ const KEY_PREFIX = 'yield-empire:game-state';
 
 export interface PersistedGameState {
   entities: GameEntity[];
-  accruedYield: number;
-  totalYieldEarned: number;
+  empireTokens: number;
+  totalEmpireEarned: number;
   guildContributed: number;
   address: string;
   savedAt: number;
@@ -29,8 +29,8 @@ export function saveGameState(
   address: string,
   state: {
     entities: GameEntity[];
-    accruedYield: number;
-    totalYieldEarned: number;
+    empireTokens: number;
+    totalEmpireEarned: number;
     guildContributed: number;
   },
 ): void {
@@ -52,18 +52,34 @@ export function loadGameState(address: string): PersistedGameState | null {
     const raw = localStorage.getItem(storageKey(address));
     if (!raw) return null;
 
-    const parsed = JSON.parse(raw) as PersistedGameState;
+    const parsed = JSON.parse(raw);
 
     // Basic validation — ensure required fields exist
-    if (
-      !Array.isArray(parsed.entities) ||
-      typeof parsed.accruedYield !== 'number' ||
-      typeof parsed.totalYieldEarned !== 'number'
-    ) {
+    if (!Array.isArray(parsed.entities)) {
       return null;
     }
 
-    return parsed;
+    // Migration: support old save format (accruedYield → empireTokens)
+    const empireTokens = typeof parsed.empireTokens === 'number'
+      ? parsed.empireTokens
+      : typeof parsed.accruedYield === 'number'
+        ? parsed.accruedYield
+        : 0;
+
+    const totalEmpireEarned = typeof parsed.totalEmpireEarned === 'number'
+      ? parsed.totalEmpireEarned
+      : typeof parsed.totalYieldEarned === 'number'
+        ? parsed.totalYieldEarned
+        : 0;
+
+    return {
+      entities: parsed.entities,
+      empireTokens,
+      totalEmpireEarned,
+      guildContributed: typeof parsed.guildContributed === 'number' ? parsed.guildContributed : 0,
+      address: parsed.address ?? address.toLowerCase(),
+      savedAt: parsed.savedAt ?? Date.now(),
+    };
   } catch {
     return null;
   }

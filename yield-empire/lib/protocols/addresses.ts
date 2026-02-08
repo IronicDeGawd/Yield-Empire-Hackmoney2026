@@ -53,6 +53,10 @@ export const PROTOCOL_ADDRESSES = {
   TREASURY: {
     BASE_SEPOLIA: (process.env.NEXT_PUBLIC_TREASURY_ADDRESS ?? '0x0000000000000000000000000000000000000000') as `0x${string}`,
   },
+  /** $EMPIRE game token on Sepolia */
+  EMPIRE_TOKEN: {
+    SEPOLIA: (process.env.NEXT_PUBLIC_EMPIRE_TOKEN_ADDRESS ?? '0x0000000000000000000000000000000000000000') as `0x${string}`,
+  },
   CIRCLE_USDC: {
     /** Circle USDC on Sepolia (used by Compound, Morpho, Uniswap directly) */
     SEPOLIA: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as const,

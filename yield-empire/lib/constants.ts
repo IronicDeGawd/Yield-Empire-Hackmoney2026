@@ -133,7 +133,7 @@ export const INITIAL_CONNECTIONS: Connection[] = [
 // Upgrade cost multiplier per level
 export const UPGRADE_COST_MULTIPLIER = 1.15;
 
-// Base cost (in USDC from accrued yield) for first upgrade
+// Base cost (in $EMPIRE tokens) for first upgrade
 export const BASE_UPGRADE_COST = 5;
 
 /** Calculate upgrade cost for a building at the given level */
