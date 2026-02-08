@@ -13,6 +13,15 @@ export const metadata: Metadata = {
   description: "Build DeFi empires with your guild through an idle game where instant, gasless transactions make playing feel like a real game.",
   keywords: ["DeFi", "idle game", "Yellow Network", "ENS", "Web3", "gaming"],
   authors: [{ name: "Yield Empire Team" }],
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
   openGraph: {
     title: "Yield Empire | DeFi Idle Tycoon",
     description: "Build DeFi empires with your guild. Instant, gasless gameplay powered by Yellow Network.",
