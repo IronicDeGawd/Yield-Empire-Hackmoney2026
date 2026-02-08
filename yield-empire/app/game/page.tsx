@@ -23,7 +23,7 @@ import type { HoverInfo } from '@/components/game/PixiIsometricMap';
 import { GameUI } from '@/components/game/GameUI';
 import { SettleConfirmDialog } from '@/components/game/SettleConfirmDialog';
 import { INITIAL_ENTITIES, INITIAL_CONNECTIONS, YIELD_MULTIPLIER_PER_LEVEL, getUpgradeCost } from '@/lib/constants';
-import { GameEntity, PlayerProfile } from '@/lib/types';
+import { GameEntity, PlayerProfile, GameEffect, GameEffectType } from '@/lib/types';
 import { useAccount } from 'wagmi';
 import { useEnsName, useEnsAvatar } from 'wagmi';
 import { STAR_DATA } from '@/components/game/pixi/effects/Starfield';
@@ -93,6 +93,20 @@ export default function GamePage() {
     return () => {
       isMountedRef.current = false;
     };
+  }, []);
+
+  // Game effects ref for particle animations
+  const gameEventsRef = useRef<GameEffect[]>([]);
+
+  // Helper to push a game effect
+  const pushEffect = useCallback((type: GameEffectType, entityId?: string, duration = 1.2) => {
+    gameEventsRef.current.push({
+      id: `${type}-${entityId ?? 'all'}-${Date.now()}`,
+      type,
+      entityId,
+      startTime: -1,
+      duration,
+    });
   }, []);
 
   // Wallet connection
@@ -207,6 +221,9 @@ export default function GamePage() {
       if (tickEmpire > 0) {
         setEmpireTokens((prev) => prev + tickEmpire);
         setTotalEmpireEarned((prev) => prev + tickEmpire);
+
+        // Trigger token earn pulse effect
+        pushEffect('token-earn', undefined, 0.8);
 
         // Debounced save: persist to localStorage every 10 seconds
         const now = Date.now();
@@ -326,6 +343,9 @@ export default function GamePage() {
       prev.map((e) => (e.id === entityId ? { ...e, level: e.level + 1 } : e))
     );
 
+    // Trigger upgrade sparkle effect
+    pushEffect('upgrade-sparkle', entityId, 1.2);
+
     try {
       await yellowSession.performAction(
         { type: 'UPGRADE_BUILDING', buildingId: entityId },
@@ -359,6 +379,9 @@ export default function GamePage() {
       );
     }
     setEmpireTokens(0);
+
+    // Trigger compound flow effect
+    pushEffect('compound-flow', undefined, 1.8);
 
     try {
       await yellowSession.performAction(
@@ -419,6 +442,9 @@ export default function GamePage() {
       });
 
       if (allSucceeded) {
+        // Trigger settle confetti effect
+        pushEffect('settle-confetti', undefined, 2.5);
+
         // Only clear persisted state and reset game on full success
         if (address) clearGameState(address);
         setEntities(INITIAL_ENTITIES);
@@ -474,6 +500,7 @@ export default function GamePage() {
           height={dimensions.height}
           onEntityClick={handleEntityClick}
           onEntityHover={setHoverInfo}
+          gameEventsRef={gameEventsRef}
         />
       </div>
 
