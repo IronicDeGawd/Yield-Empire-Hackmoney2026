@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Container as PixiContainerClass, Graphics } from 'pixi.js';
 import { useTick } from '@pixi/react';
 import { PixiApplication } from './pixi/PixiApplication';
-import { GameEntity, Connection } from '@/lib/types';
+import { GameEntity, Connection, GameEffect } from '@/lib/types';
 import {
   gridToScreen,
   sortByDepth,
@@ -21,6 +21,10 @@ import {
 } from '@/lib/utils/pixi-isometric';
 import { drawSmokeParticles } from './pixi/effects/SmokeParticles';
 import { drawCrystalGlow } from './pixi/effects/GlowEffect';
+import { drawUpgradeSparkle } from './pixi/effects/UpgradeSparkle';
+import { drawCompoundFlow } from './pixi/effects/CompoundFlow';
+import { drawSettleConfetti } from './pixi/effects/SettleConfetti';
+import { drawTokenEarnPulse } from './pixi/effects/TokenEarnPulse';
 import { type GameSpriteTextures, loadGameSpriteTextures } from './pixi/assets';
 import { CLOUD_DATA, type CloudData } from './pixi/effects/Starfield';
 
@@ -37,6 +41,7 @@ interface PixiIsometricMapProps {
   height: number;
   onEntityClick?: (entity: GameEntity) => void;
   onEntityHover?: (info: HoverInfo | null) => void;
+  gameEventsRef?: React.MutableRefObject<GameEffect[]>;
 }
 
 /**
@@ -52,9 +57,22 @@ function IsometricScene({
   onEntityClick,
   onEntityHover,
   textures,
+  gameEventsRef,
 }: PixiIsometricMapProps & { textures: GameSpriteTextures; isUnmounted: React.MutableRefObject<boolean> }) {
   const timeRef = useRef(0);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  // Track if the ticker should be enabled - disabled before unmount to prevent
+  // cleanup race condition with PixiJS Application destruction
+  const [tickerEnabled, setTickerEnabled] = useState(true);
+
+  // Disable ticker before component unmounts to prevent Ticker.remove() crash
+  useEffect(() => {
+    setTickerEnabled(true);
+    return () => {
+      setTickerEnabled(false);
+    };
+  }, []);
 
   // Animated effects graphics ref (redrawn each frame)
   const effectsRef = useRef<Graphics | null>(null);
@@ -140,44 +158,93 @@ function IsometricScene({
     [width, height]
   );
 
-  useTick((ticker) => {
-    // Guard against operations after unmount (prevents crashes on page refresh)
-    if (isUnmounted.current) return;
+  useTick(
+    (ticker) => {
+      // Guard against operations after unmount (prevents crashes on page refresh)
+      if (isUnmounted.current) return;
 
-    timeRef.current += ticker.deltaTime / 60;
-    const dt = ticker.deltaTime / 60;
+      timeRef.current += ticker.deltaTime / 60;
+      const dt = ticker.deltaTime / 60;
 
-    // Advance cloud offsets and update container positions
-    const diagonal = Math.sqrt(width * width + height * height);
-    CLOUD_DATA.forEach((cloud, i) => {
-      const normalizedSpeed = cloud.speed / diagonal;
-      cloudOffsets.current[i] += normalizedSpeed * dt;
-      if (cloudOffsets.current[i] > 1.15) {
-        cloudOffsets.current[i] = -0.15;
-      }
-      const container = cloudContainerRefs.current[i];
-      if (container) {
-        const pos = getCloudPos(cloud, cloudOffsets.current[i]);
-        container.x = pos.x;
-        container.y = pos.y;
-      }
-    });
+      // Advance cloud offsets and update container positions
+      const diagonal = Math.sqrt(width * width + height * height);
+      CLOUD_DATA.forEach((cloud, i) => {
+        const normalizedSpeed = cloud.speed / diagonal;
+        cloudOffsets.current[i] += normalizedSpeed * dt;
+        if (cloudOffsets.current[i] > 1.15) {
+          cloudOffsets.current[i] = -0.15;
+        }
+        const container = cloudContainerRefs.current[i];
+        if (container) {
+          const pos = getCloudPos(cloud, cloudOffsets.current[i]);
+          container.x = pos.x;
+          container.y = pos.y;
+        }
+      });
 
-    // Redraw effects (smoke, glow)
-    const g = effectsRef.current;
-    if (!g) return;
-    g.clear();
+      // Redraw effects (smoke, glow)
+      const g = effectsRef.current;
+      if (!g) return;
+      g.clear();
 
-    sortedEntities.forEach((entity) => {
-      const pos = gridToScreen(entity.position.x, entity.position.y, origin);
-      if (entity.type === 'factory') {
-        drawSmokeParticles(g, pos.x, pos.y + 8, timeRef.current);
+      sortedEntities.forEach((entity) => {
+        const pos = gridToScreen(entity.position.x, entity.position.y, origin);
+        if (entity.type === 'factory') {
+          drawSmokeParticles(g, pos.x, pos.y + 8, timeRef.current);
+        }
+        if (entity.type === 'crystal') {
+          drawCrystalGlow(g, pos.x, pos.y, entity.color, timeRef.current);
+        }
+      });
+
+      // Process game effects (particle animations)
+      const events = gameEventsRef?.current;
+      if (events) {
+        let i = events.length;
+        while (i--) {
+          const fx = events[i];
+          if (fx.startTime < 0) fx.startTime = timeRef.current;
+
+          const progress = (timeRef.current - fx.startTime) / fx.duration;
+          if (progress >= 1) {
+            events.splice(i, 1);
+            continue;
+          }
+
+          switch (fx.type) {
+            case 'upgrade-sparkle': {
+              const pos = fx.entityId ? entityPositions.get(fx.entityId) : null;
+              if (pos) drawUpgradeSparkle(g, pos.x, pos.y + BUILDING_BASE_OFFSET_Y, progress);
+              break;
+            }
+            case 'compound-flow': {
+              const targets = sortedEntities.map((e) => {
+                const p = entityPositions.get(e.id)!;
+                return { x: p.x, y: p.y + BUILDING_BASE_OFFSET_Y };
+              });
+              const cx = targets.reduce((s, t) => s + t.x, 0) / targets.length;
+              const cy = targets.reduce((s, t) => s + t.y, 0) / targets.length;
+              drawCompoundFlow(g, cx, cy, targets, progress);
+              break;
+            }
+            case 'settle-confetti':
+              drawSettleConfetti(g, width, height, progress);
+              break;
+            case 'token-earn': {
+              sortedEntities.forEach((e) => {
+                if (e.deposited > 0) {
+                  const p = entityPositions.get(e.id);
+                  if (p) drawTokenEarnPulse(g, p.x, p.y + BUILDING_BASE_OFFSET_Y, progress);
+                }
+              });
+              break;
+            }
+          }
+        }
       }
-      if (entity.type === 'crystal') {
-        drawCrystalGlow(g, pos.x, pos.y, entity.color, timeRef.current);
-      }
-    });
-  });
+    },
+    { isEnabled: tickerEnabled }
+  );
 
   const bgClouds = useMemo(() => {
     const result: { cloud: CloudData; index: number }[] = [];

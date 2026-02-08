@@ -22,8 +22,9 @@ import { BuildingPopup } from '@/components/game/BuildingPopup';
 import type { HoverInfo } from '@/components/game/PixiIsometricMap';
 import { GameUI } from '@/components/game/GameUI';
 import { SettleConfirmDialog } from '@/components/game/SettleConfirmDialog';
+import { DeFiGuide } from '@/components/game/DeFiGuide';
 import { INITIAL_ENTITIES, INITIAL_CONNECTIONS, YIELD_MULTIPLIER_PER_LEVEL, getUpgradeCost } from '@/lib/constants';
-import { GameEntity, PlayerProfile } from '@/lib/types';
+import { GameEntity, PlayerProfile, GameEffect, GameEffectType } from '@/lib/types';
 import { useAccount } from 'wagmi';
 import { useEnsName, useEnsAvatar } from 'wagmi';
 import { STAR_DATA } from '@/components/game/pixi/effects/Starfield';
@@ -32,7 +33,7 @@ import { useProtocolRates } from '@/hooks/useProtocolRates';
 import { DepositPanel } from '@/components/game/DepositPanel';
 import { WelcomeModal } from '@/components/game/WelcomeModal';
 import { proxyAvatarUrl } from '@/lib/ens/guild-manager';
-import { saveGameState, loadGameState, clearGameState } from '@/lib/game-storage';
+import { saveGameState, loadGameState } from '@/lib/game-storage';
 
 // Dynamic import with SSR disabled - PixiJS requires browser APIs (WebGL, canvas)
 // This prevents white screen crashes on page refresh by ensuring the component
@@ -67,7 +68,6 @@ export default function GamePage() {
   const router = useRouter();
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
   const [entities, setEntities] = useState<GameEntity[]>(INITIAL_ENTITIES);
-  const [selectedEntity, setSelectedEntity] = useState<GameEntity | null>(null);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [empireTokens, setEmpireTokens] = useState(0);
   const [totalEmpireEarned, setTotalEmpireEarned] = useState(0);
@@ -81,6 +81,33 @@ export default function GamePage() {
   // Retry limit for Yellow Network auto-connect (max 4 attempts)
   const MAX_CONNECT_ATTEMPTS = 4;
   const connectAttemptsRef = useRef(0);
+
+  // Retry limit for auto-create session (max 3 attempts)
+  const MAX_SESSION_ATTEMPTS = 3;
+  const sessionAttemptsRef = useRef(0);
+
+  // Track whether the component is mounted to prevent stale async operations
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Game effects ref for particle animations
+  const gameEventsRef = useRef<GameEffect[]>([]);
+
+  // Helper to push a game effect
+  const pushEffect = useCallback((type: GameEffectType, entityId?: string, duration = 1.2) => {
+    gameEventsRef.current.push({
+      id: `${type}-${entityId ?? 'all'}-${Date.now()}`,
+      type,
+      entityId,
+      startTime: -1,
+      duration,
+    });
+  }, []);
 
   // Wallet connection
   const { address, isConnected } = useAccount();
@@ -178,7 +205,11 @@ export default function GamePage() {
   // ── $EMPIRE accrual timer ──────────────────────────────────────────────
   // Accrues $EMPIRE every 2 seconds (demo speed: 1 tick = ~10 min of real time)
   const entitiesRef = useRef(entities);
-  entitiesRef.current = entities;
+
+  // Update ref in useEffect to avoid accessing ref during render
+  useEffect(() => {
+    entitiesRef.current = entities;
+  }, [entities]);
 
   useEffect(() => {
     if (!ysSessionActive) return;
@@ -194,6 +225,9 @@ export default function GamePage() {
       if (tickEmpire > 0) {
         setEmpireTokens((prev) => prev + tickEmpire);
         setTotalEmpireEarned((prev) => prev + tickEmpire);
+
+        // Trigger token earn pulse effect
+        pushEffect('token-earn', undefined, 0.8);
 
         // Debounced save: persist to localStorage every 10 seconds
         const now = Date.now();
@@ -220,15 +254,18 @@ export default function GamePage() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [ysSessionActive, address]);
+  }, [ysSessionActive, address, pushEffect]);
 
   // ── Auto-connect to Yellow Network (max 4 attempts) ────────────────
 
   useEffect(() => {
+    if (!isMountedRef.current) return;
     if (isConnected && !ysConnected && !ysConnecting && connectAttemptsRef.current < MAX_CONNECT_ATTEMPTS) {
       connectAttemptsRef.current++;
       ysConnect().catch((err) => {
-        console.error(`Yellow Network connect attempt ${connectAttemptsRef.current}/${MAX_CONNECT_ATTEMPTS} failed:`, err);
+        if (isMountedRef.current) {
+          console.error(`Yellow Network connect attempt ${connectAttemptsRef.current}/${MAX_CONNECT_ATTEMPTS} failed:`, err);
+        }
       });
     }
   }, [isConnected, ysConnected, ysConnecting, ysConnect]);
@@ -240,14 +277,22 @@ export default function GamePage() {
     }
   }, [ysConnected]);
 
-  // Auto-create session after Yellow Network connects
+  // Auto-create session after Yellow Network connects (max 3 attempts)
   useEffect(() => {
-    if (ysConnected && !ysSessionActive && !ysConnecting) {
+    if (ysConnected && !ysSessionActive && !ysConnecting && sessionAttemptsRef.current < MAX_SESSION_ATTEMPTS) {
+      sessionAttemptsRef.current++;
       ysCreateSession().catch((err) => {
-        console.error('Failed to create Yellow Network session:', err);
+        console.error(`Session create attempt ${sessionAttemptsRef.current}/${MAX_SESSION_ATTEMPTS} failed:`, err);
       });
     }
   }, [ysConnected, ysSessionActive, ysConnecting, ysCreateSession]);
+
+  // Reset session attempt counter on successful session creation
+  useEffect(() => {
+    if (ysSessionActive) {
+      sessionAttemptsRef.current = 0;
+    }
+  }, [ysSessionActive]);
 
   // ── Persist helper ──────────────────────────────────────────────────
   const persistState = useCallback(() => {
@@ -302,6 +347,9 @@ export default function GamePage() {
       prev.map((e) => (e.id === entityId ? { ...e, level: e.level + 1 } : e))
     );
 
+    // Trigger upgrade sparkle effect
+    pushEffect('upgrade-sparkle', entityId, 1.2);
+
     try {
       await yellowSession.performAction(
         { type: 'UPGRADE_BUILDING', buildingId: entityId },
@@ -316,7 +364,7 @@ export default function GamePage() {
         prev.map((e) => (e.id === entityId ? { ...e, level: e.level - 1 } : e))
       );
     }
-  }, [yellowSession, entities, empireTokens, persistState]);
+  }, [yellowSession, entities, empireTokens, persistState, pushEffect]);
 
   // Compound all — reinvest $EMPIRE across buildings proportionally
   const handleCompoundAll = useCallback(async () => {
@@ -335,6 +383,9 @@ export default function GamePage() {
       );
     }
     setEmpireTokens(0);
+
+    // Trigger compound flow effect
+    pushEffect('compound-flow', undefined, 1.8);
 
     try {
       await yellowSession.performAction(
@@ -355,7 +406,7 @@ export default function GamePage() {
       }
       setEmpireTokens(tokensToCompound);
     }
-  }, [yellowSession, entities, empireTokens, persistState]);
+  }, [yellowSession, entities, empireTokens, persistState, pushEffect]);
 
   // Contribute to guild
   const handleGuildContribute = useCallback(async (amount: number) => {
@@ -395,12 +446,16 @@ export default function GamePage() {
       });
 
       if (allSucceeded) {
-        // Only clear persisted state and reset game on full success
-        if (address) clearGameState(address);
-        setEntities(INITIAL_ENTITIES);
+        // Trigger settle confetti effect
+        pushEffect('settle-confetti', undefined, 2.5);
+
+        // Reset session tracking but KEEP deposited amounts and building levels
+        // (your funds are now on-chain in real protocols!)
         setEmpireTokens(0);
         setTotalEmpireEarned(0);
-        setGuildContributed(0);
+        // Keep entities (deposits + levels) - they persist on-chain
+        // Persist the current state with reset empire tokens
+        persistState();
       } else {
         // Partial failure - show which transactions failed, preserve state
         const failed = yellowSession.lastSettlement?.transactions
@@ -413,21 +468,22 @@ export default function GamePage() {
       console.error('Settlement failed:', err);
       alert('Settlement failed. Please try again.');
     }
-  }, [yellowSession, entities, empireLevel, totalEmpireEarned, ensName, address]);
+  }, [yellowSession, entities, empireLevel, totalEmpireEarned, ensName, persistState, pushEffect]);
 
   // Handle entity click
   const handleEntityClick = (entity: GameEntity) => {
-    setSelectedEntity(entity);
+    // Currently only used for hover info - could add click actions later
+    console.log('Entity clicked:', entity.name);
   };
 
   return (
-    <div id="main-content" className="w-full h-screen relative overflow-hidden select-none bg-game-bg">
+    <div id="main-content" className="w-full h-screen relative overflow-hidden select-none bg-background cloud-bg">
       {/* Background Starfield Effect - Pre-computed positions */}
       <div className="absolute inset-0 pointer-events-none">
         {STAR_DATA.map((star, i) => (
           <div
             key={`star-${i}`}
-            className="absolute rounded-full bg-white opacity-60 animate-pulse"
+            className="absolute rounded-full bg-gold opacity-60 animate-twinkle"
             style={{
               top: `${star.y * 100}%`,
               left: `${star.x * 100}%`,
@@ -439,6 +495,7 @@ export default function GamePage() {
         ))}
         {/* Cloud sprites now rendered in Pixi layer */}
       </div>
+      <div className="grid-overlay absolute inset-0 pointer-events-none" />
 
       {/* PixiJS Isometric Game Layer */}
       <div className="absolute inset-0 flex items-center justify-center z-10">
@@ -449,11 +506,17 @@ export default function GamePage() {
           height={dimensions.height}
           onEntityClick={handleEntityClick}
           onEntityHover={setHoverInfo}
+          gameEventsRef={gameEventsRef}
         />
       </div>
 
       {/* UI Overlay Layer */}
       <div className="absolute inset-0 z-20">
+        {/* DeFi Educational Guide - Left Side */}
+        <div className="absolute left-6 top-1/2 -translate-y-1/2">
+          <DeFiGuide />
+        </div>
+
         <GameUI
           entities={entities}
           player={player}

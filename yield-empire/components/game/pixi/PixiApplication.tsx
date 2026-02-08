@@ -25,10 +25,23 @@ interface PixiApplicationProps {
 export function PixiApplication({ width, height, children, onInit }: PixiApplicationProps) {
   const [mounted, setMounted] = useState(false);
   const appRef = useRef<PixiApp | null>(null);
+  const destroyedRef = useRef(false);
 
   // SSR guard - PixiJS requires browser APIs (canvas, WebGL)
   useEffect(() => {
+    destroyedRef.current = false;
     setMounted(true);
+
+    return () => {
+      destroyedRef.current = true;
+      setMounted(false);
+      // Do NOT call app.destroy() here — setting mounted=false unmounts the
+      // <Application> component, which lets @pixi/react clean up useTick,
+      // resize observers, and the WebGL context in the correct order.
+      // Calling destroy() before React unmounts children causes null-pointer
+      // crashes in Ticker.remove and ResizePlugin.destroy.
+      appRef.current = null;
+    };
   }, []);
 
   // Force canvas resize when tab regains focus or visibility
@@ -36,9 +49,14 @@ export function PixiApplication({ width, height, children, onInit }: PixiApplica
   useEffect(() => {
     if (!mounted) return;
     const forceResize = () => {
+      if (destroyedRef.current) return;
       const app = appRef.current;
       if (app?.renderer) {
-        app.renderer.resize(window.innerWidth, window.innerHeight);
+        try {
+          app.renderer.resize(window.innerWidth, window.innerHeight);
+        } catch {
+          // Renderer may be destroyed — ignore
+        }
       }
     };
     const onVisibility = () => {
@@ -54,6 +72,9 @@ export function PixiApplication({ width, height, children, onInit }: PixiApplica
 
   const handleInit = useCallback(
     (app: PixiApp) => {
+      // Guard against init callback firing after component unmount
+      if (destroyedRef.current) return;
+
       app.renderer.background.alpha = 0;
       app.renderer.background.color = 0x000000;
       appRef.current = app;

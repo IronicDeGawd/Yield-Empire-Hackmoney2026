@@ -57,7 +57,7 @@ async function ensureChainInWallet(chainId: number): Promise<void> {
 
   const eth =
     typeof window !== 'undefined'
-      ? ((window as Record<string, unknown>).ethereum as {
+      ? ((window as unknown as Record<string, unknown>).ethereum as {
           request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
         } | undefined)
       : undefined;
@@ -291,16 +291,16 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-game-panel border-2 border-game-border rounded-xl p-5 text-white w-96 shadow-2xl font-mono max-h-[90vh] overflow-y-auto">
+      <div className="retro-card retro-card-purple p-5 text-foreground w-96 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold uppercase tracking-wider">
+          <h2 className="font-pixel text-[10px] text-gold uppercase tracking-wider">
             Deposit USDC
           </h2>
           <button
             onClick={handleClose}
             disabled={isLoading}
-            className="text-gray-400 hover:text-white disabled:opacity-50"
+            className="text-muted-foreground hover:text-foreground disabled:opacity-50"
             aria-label="Close deposit panel"
           >
             <X size={20} />
@@ -309,12 +309,12 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
 
         {/* Pending bridge recovery banner */}
         {hasPendingBridge && !isActive && (
-          <div className="mb-4 bg-yellow-900/30 border border-yellow-600 rounded-lg p-3 text-xs text-yellow-200">
-            <div className="flex items-center gap-2 mb-1 font-bold">
+          <div className="mb-4 bg-gold/10 border border-gold/30 rounded-sm p-3 font-retro text-sm text-gold">
+            <div className="flex items-center gap-2 mb-1 font-pixel text-[8px]">
               <RotateCw size={12} />
               Interrupted transfer detected
             </div>
-            <p className="text-yellow-300/80">
+            <p className="text-gold/80">
               A previous {fromChain.replace('_', ' ')} &rarr; {toChain.replace('_', ' ')} bridge was interrupted.
               You can start a new bridge to complete the transfer.
             </p>
@@ -323,7 +323,7 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
                 localStorage.removeItem(PENDING_BRIDGE_KEY);
                 setHasPendingBridge(false);
               }}
-              className="mt-2 text-yellow-400 hover:text-yellow-300 underline text-xs"
+              className="mt-2 text-gold hover:text-foreground underline font-retro text-sm"
             >
               Dismiss
             </button>
@@ -334,7 +334,7 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
           <>
             {/* From Chain */}
             <div className="mb-3">
-              <label htmlFor="from-chain" className="text-xs text-gray-400 uppercase mb-1 block">
+              <label htmlFor="from-chain" className="font-pixel text-[8px] text-muted-foreground uppercase mb-1 block">
                 From
               </label>
               <div className="flex gap-2">
@@ -343,16 +343,16 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
                     id="from-chain"
                     value={fromChain}
                     onChange={(e) => setFromChain(e.target.value)}
-                    className="w-full bg-purple-900/50 border border-purple-600 rounded-lg px-3 py-2 text-sm appearance-none cursor-pointer"
+                    className="w-full bg-secondary border border-border rounded-sm px-3 py-2 font-retro text-base text-foreground appearance-none cursor-pointer"
                   >
                     {CHAINS.map((c) => (
                       <option key={c.id} value={c.id}>{c.label}</option>
                     ))}
                   </select>
-                  <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 </div>
               </div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="font-retro text-sm text-muted-foreground mt-1">
                 Balance: {balanceLoading ? '\u2026' : `${parseFloat(fromBalance).toFixed(2)} USDC`}
               </div>
             </div>
@@ -364,16 +364,16 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
                   setFromChain(toChain);
                   setToChain(fromChain);
                 }}
-                className="bg-purple-700 hover:bg-purple-600 rounded-full p-1.5 border border-purple-500"
+                className="bg-primary/20 hover:bg-primary/30 rounded-sm p-1.5 border border-border transition-colors"
                 aria-label="Swap chains"
               >
-                <ArrowDownUp size={14} />
+                <ArrowDownUp size={14} className="text-primary" />
               </button>
             </div>
 
             {/* To Chain */}
             <div className="mb-4">
-              <label htmlFor="to-chain" className="text-xs text-gray-400 uppercase mb-1 block">
+              <label htmlFor="to-chain" className="font-pixel text-[8px] text-muted-foreground uppercase mb-1 block">
                 To
               </label>
               <div className="relative">
@@ -381,19 +381,19 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
                   id="to-chain"
                   value={toChain}
                   onChange={(e) => setToChain(e.target.value)}
-                  className="w-full bg-purple-900/50 border border-purple-600 rounded-lg px-3 py-2 text-sm appearance-none cursor-pointer"
+                  className="w-full bg-secondary border border-border rounded-sm px-3 py-2 font-retro text-base text-foreground appearance-none cursor-pointer"
                 >
                   {CHAINS.map((c) => (
                     <option key={c.id} value={c.id}>{c.label}</option>
                   ))}
                 </select>
-                <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               </div>
             </div>
 
             {/* Amount */}
             <div className="mb-4">
-              <label htmlFor="bridge-amount" className="text-xs text-gray-400 uppercase mb-1 block">
+              <label htmlFor="bridge-amount" className="font-pixel text-[8px] text-muted-foreground uppercase mb-1 block">
                 Amount (USDC)
               </label>
               <div className="flex gap-2">
@@ -405,11 +405,11 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
                   placeholder="0.00"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="flex-1 bg-purple-900/50 border border-purple-600 rounded-lg px-3 py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="flex-1 bg-secondary border border-border rounded-sm px-3 py-2 font-retro text-base text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <button
                   onClick={handleSetMax}
-                  className="bg-purple-700 hover:bg-purple-600 text-xs px-3 py-2 rounded-lg border border-purple-500 uppercase"
+                  className="bracket-btn bracket-btn-blue font-pixel text-[8px] px-3 py-2"
                 >
                   Max
                 </button>
@@ -418,19 +418,19 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
 
             {/* Fee Estimate */}
             {estimateData && (
-              <div className="mb-4 bg-purple-900/30 rounded-lg p-3 text-xs space-y-1">
-                <div className="flex justify-between text-gray-300">
+              <div className="mb-4 bg-secondary/50 rounded-sm p-3 border border-border font-retro text-sm space-y-1">
+                <div className="flex justify-between text-muted-foreground">
                   <span>Protocol fees:</span>
-                  <span className="text-white">
+                  <span className="text-foreground">
                     {estimateData.fees.length > 0
                       ? estimateData.fees.map((f) => `${f.amount ?? '0'} ${f.token}`).join(', ')
                       : 'None'}
                   </span>
                 </div>
                 {estimateData.gasFees.length > 0 && (
-                  <div className="flex justify-between text-gray-300">
+                  <div className="flex justify-between text-muted-foreground">
                     <span>Gas fees:</span>
-                    <span className="text-white">
+                    <span className="text-foreground">
                       {estimateData.gasFees
                         .filter((g) => g.fees)
                         .map((g) => `${g.name}: ${g.token}`)
@@ -438,16 +438,16 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between text-gray-300">
+                <div className="flex justify-between text-muted-foreground">
                   <span>Route:</span>
-                  <span className="text-white">{fromLabel} &rarr; {toLabel}</span>
+                  <span className="text-foreground">{fromLabel} &rarr; {toLabel}</span>
                 </div>
               </div>
             )}
 
             {/* Error */}
             {error && (
-              <div className="mb-3 text-red-400 text-xs bg-red-900/20 rounded-lg p-2">
+              <div className="mb-3 text-destructive font-retro text-sm bg-destructive/10 rounded-sm p-2 border border-destructive/30">
                 {error}
               </div>
             )}
@@ -457,7 +457,7 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
               <button
                 onClick={handleEstimate}
                 disabled={!canBridge || isEstimating}
-                className="flex-1 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold py-2.5 px-4 rounded-lg border border-purple-500 uppercase flex items-center justify-center gap-2"
+                className="flex-1 bracket-btn bracket-btn-blue font-pixel text-[8px] py-2.5 px-4 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isEstimating && <Loader2 size={14} className="animate-spin" />}
                 Estimate
@@ -465,7 +465,7 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
               <button
                 onClick={handleBridge}
                 disabled={!canBridge}
-                className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-black text-sm font-bold py-2.5 px-4 rounded-lg border-b-2 border-yellow-800 uppercase flex items-center justify-center gap-2"
+                className="flex-1 arcade-btn arcade-btn-gold font-pixel text-[8px] py-2.5 px-4 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isLoading && <Loader2 size={14} className="animate-spin" />}
                 Bridge
@@ -487,20 +487,20 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
                 else if (stepIdx === currentIdx) status = 'active';
 
                 return (
-                  <div key={step} className="flex items-center gap-3 text-sm">
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs border ${
+                  <div key={step} className="flex items-center gap-3 font-retro text-base">
+                    <div className={`w-5 h-5 rounded-sm flex items-center justify-center font-pixel text-[8px] border ${
                       status === 'done'
-                        ? 'bg-green-600 border-green-500'
+                        ? 'bg-neon-green/20 border-neon-green text-neon-green'
                         : status === 'active'
-                          ? isError ? 'bg-red-600 border-red-500 animate-pulse' : 'bg-yellow-600 border-yellow-500 animate-pulse'
-                          : 'bg-purple-900/50 border-purple-600'
+                          ? isError ? 'bg-destructive/20 border-destructive text-destructive animate-pulse' : 'bg-gold/20 border-gold text-gold animate-pulse'
+                          : 'bg-secondary border-border text-muted-foreground'
                     }`}>
                       {status === 'done' ? <Check size={12} /> : stepIdx + 1}
                     </div>
                     <span className={
-                      status === 'done' ? 'text-green-400' :
-                      status === 'active' ? (isError ? 'text-red-400' : 'text-yellow-400') :
-                      'text-gray-500'
+                      status === 'done' ? 'text-neon-green' :
+                      status === 'active' ? (isError ? 'text-destructive' : 'text-gold') :
+                      'text-muted-foreground'
                     }>
                       {STEP_LABELS[step]}
                     </span>
@@ -511,17 +511,17 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
 
             {/* Status */}
             <div className="mb-4 text-center">
-              <span className={`text-sm font-bold uppercase ${
-                isDone ? 'text-green-400' :
-                progress.currentStep === 'error' ? 'text-red-400' :
-                'text-yellow-400'
+              <span className={`font-pixel text-[9px] uppercase ${
+                isDone ? 'text-neon-green' :
+                progress.currentStep === 'error' ? 'text-destructive' :
+                'text-gold'
               }`}>
                 {STEP_LABELS[progress.currentStep]}
               </span>
             </div>
 
             {/* Log output */}
-            <div className="bg-black/40 rounded-lg p-3 mb-4 max-h-40 overflow-y-auto text-xs text-gray-300 space-y-0.5">
+            <div className="bg-background/60 rounded-sm p-3 mb-4 max-h-40 overflow-y-auto font-retro text-sm text-muted-foreground space-y-0.5 border border-border">
               {progress.logs.map((log, i) => (
                 <div key={i} className="break-all">{log}</div>
               ))}
@@ -531,7 +531,7 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
             {isDone && (
               <button
                 onClick={handleClose}
-                className="w-full font-bold py-2.5 px-4 rounded-lg text-sm uppercase bg-green-700 hover:bg-green-600 text-white border border-green-500"
+                className="w-full arcade-btn font-pixel text-[9px] py-2.5 px-4 bg-neon-green/20 border-2 border-neon-green text-neon-green hover:bg-neon-green/30"
               >
                 Done
               </button>
@@ -541,14 +541,14 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
                 <button
                   onClick={handleRetry}
                   disabled={isLoading || !lastResultRef.current}
-                  className="flex-1 font-bold py-2.5 px-4 rounded-lg text-sm uppercase bg-yellow-700 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed text-white border border-yellow-500 flex items-center justify-center gap-2"
+                  className="flex-1 arcade-btn arcade-btn-gold font-pixel text-[9px] py-2.5 px-4 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   <RotateCw size={14} />
                   Retry
                 </button>
                 <button
                   onClick={handleClose}
-                  className="flex-1 font-bold py-2.5 px-4 rounded-lg text-sm uppercase bg-red-700 hover:bg-red-600 text-white border border-red-500"
+                  className="flex-1 bracket-btn font-pixel text-[9px] py-2.5 px-4 text-destructive border-destructive/50"
                 >
                   Close
                 </button>

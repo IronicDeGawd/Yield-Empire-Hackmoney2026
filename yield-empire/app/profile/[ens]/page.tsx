@@ -12,19 +12,26 @@
 import { use } from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft,
   Zap,
   Trophy,
   Star,
   TrendingUp,
   Shield,
   Loader2,
+  ArrowLeft,
 } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { usePlayerProfile, usePlayerIdentity } from '@/hooks/useENS';
 import { BUILDING_CONFIGS, COLORS } from '@/lib/constants';
 import type { ProtocolId } from '@/lib/types';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { StarField } from '@/components/ui/StarField';
+import { RetroNav } from '@/components/ui/RetroNav';
+import {
+  RetroCard,
+  RetroCardHeader,
+  RetroCardTitle,
+  RetroCardContent,
+} from '@/components/ui/RetroCard';
 
 /** Achievement badge data derived from player stats */
 function getAchievements(empireLevel: number, totalDeposited: number, prestigeCount: number) {
@@ -95,147 +102,163 @@ export default function ProfilePage({ params }: { params: Promise<{ ens: string 
   );
 
   return (
-    <div className="min-h-screen bg-game-bg text-white">
-      {/* Header */}
-      <header className="bg-game-bg/80 backdrop-blur-md border-b border-game-border">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
-          <Link
-            href="/game"
-            className="flex items-center gap-2 text-purple-300 hover:text-white transition-colors"
-          >
-            <ArrowLeft size={18} />
-            Back to Game
-          </Link>
-          <ConnectButton showBalance={false} />
-        </div>
-      </header>
+    <div className="page-scrollable bg-background relative overflow-hidden cloud-bg text-foreground">
+      {/* Background effects */}
+      <StarField />
+      <div className="grid-overlay absolute inset-0" />
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 size={32} className="animate-spin text-purple-400" />
-            <span className="ml-3 text-gray-400">Loading profile\u2026</span>
-          </div>
-        ) : error ? (
-          <div className="text-center py-20">
-            <p className="text-red-400 mb-4">Failed to load profile for &quot;{decodedName}&quot;</p>
-            <Link href="/game" className="text-purple-400 hover:text-purple-300 underline">
-              Return to game
+      {/* Navigation */}
+      <RetroNav />
+
+      <main className="relative pt-24 px-4 pb-12">
+        <div className="max-w-4xl mx-auto relative z-10">
+          {/* Back Link */}
+          <div className="mb-6">
+            <Link
+              href="/game"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft size={16} />
+              <span className="font-pixel text-[10px]">BACK TO GAME</span>
             </Link>
           </div>
-        ) : (
-          <>
-            {/* Profile Header */}
-            <div className="bg-game-panel border-2 border-game-border rounded-xl p-6 mb-6">
-              <div className="flex items-center gap-6">
-                {/* Avatar */}
-                <div className="w-20 h-20 rounded-xl border-2 border-yellow-500 overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 shrink-0">
-                  {profile?.avatar ? (
-                    <img
-                      src={profile.avatar}
-                      alt={displayName}
-                      width={80}
-                      height={80}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-3xl font-bold">
-                      {displayName.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </div>
 
-                {/* Name & Level */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-1">
-                    <h1 className="text-2xl font-bold truncate">{displayName}</h1>
-                    <span className="text-sm bg-purple-600 px-2 py-0.5 rounded text-purple-200 shrink-0">
-                      Lv.{profile?.empireLevel ?? 1}
-                    </span>
-                    {isOwnProfile && (
-                      <span className="text-xs bg-yellow-600/30 text-yellow-400 px-2 py-0.5 rounded shrink-0">
-                        You
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 size={32} className="animate-spin text-primary" />
+              <span className="ml-3 font-retro text-base text-muted-foreground">
+                Loading profile&hellip;
+              </span>
+            </div>
+          ) : error ? (
+            <div className="text-center py-20">
+              <p className="font-retro text-base text-destructive mb-4">
+                Failed to load profile for &quot;{decodedName}&quot;
+              </p>
+              <Link href="/game" className="font-retro text-base text-primary hover:text-gold">
+                Return to game
+              </Link>
+            </div>
+          ) : (
+            <>
+              {/* Profile Header */}
+              <RetroCard borderColor="gold" className="mb-6">
+                <div className="flex items-center gap-6">
+                  {/* Avatar */}
+                  <div className="w-20 h-20 rounded border-2 border-gold overflow-hidden bg-primary/20 shrink-0 flex items-center justify-center">
+                    {profile?.avatar ? (
+                      <img
+                        src={profile.avatar}
+                        alt={displayName}
+                        width={80}
+                        height={80}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="font-pixel text-2xl text-primary">
+                        {displayName.charAt(0).toUpperCase()}
                       </span>
                     )}
                   </div>
-                  {shortAddress && (
-                    <p className="text-gray-400 text-sm font-mono">{shortAddress}</p>
-                  )}
+
+                  {/* Name & Level */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h1 className="font-pixel text-sm text-foreground truncate">{displayName}</h1>
+                      <span className="font-pixel text-[8px] bg-primary/30 px-2 py-0.5 rounded-sm text-primary shrink-0">
+                        Lv.{profile?.empireLevel ?? 1}
+                      </span>
+                      {isOwnProfile && (
+                        <span className="font-pixel text-[8px] bg-gold/20 text-gold px-2 py-0.5 rounded-sm shrink-0">
+                          You
+                        </span>
+                      )}
+                    </div>
+                    {shortAddress && (
+                      <p className="font-retro text-sm text-muted-foreground">{shortAddress}</p>
+                    )}
+                  </div>
+                </div>
+              </RetroCard>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="stat-box rounded-sm">
+                  <div className="flex items-center gap-2 mb-2 justify-center">
+                    <Star size={16} className="text-gold" />
+                    <span className="font-pixel text-[8px] text-muted-foreground">EMPIRE LVL</span>
+                  </div>
+                  <div className="font-pixel text-lg text-gold">
+                    {profile?.empireLevel ?? 1}
+                  </div>
+                </div>
+                <div className="stat-box rounded-sm">
+                  <div className="flex items-center gap-2 mb-2 justify-center">
+                    <TrendingUp size={16} className="text-neon-green" />
+                    <span className="font-pixel text-[8px] text-muted-foreground">DEPOSITED</span>
+                  </div>
+                  <div className="font-pixel text-lg text-gold">
+                    ${(profile?.totalDeposited ?? 0).toLocaleString()}
+                  </div>
+                </div>
+                <div className="stat-box rounded-sm">
+                  <div className="flex items-center gap-2 mb-2 justify-center">
+                    <Zap size={16} className="text-primary" />
+                    <span className="font-pixel text-[8px] text-muted-foreground">$EMPIRE</span>
+                  </div>
+                  <div className="font-pixel text-lg text-gold">
+                    {(profile?.totalEmpireEarned ?? 0).toFixed(2)}
+                  </div>
+                </div>
+                <div className="stat-box rounded-sm">
+                  <div className="flex items-center gap-2 mb-2 justify-center">
+                    <Shield size={16} className="text-neon-pink" />
+                    <span className="font-pixel text-[8px] text-muted-foreground">PRESTIGE</span>
+                  </div>
+                  <div className="font-pixel text-lg text-gold">
+                    {profile?.prestigeCount ?? 0}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <StatCard
-                label="Empire Level"
-                value={String(profile?.empireLevel ?? 1)}
-                icon={<Star size={20} className="text-yellow-400" />}
-              />
-              <StatCard
-                label="Total Deposited"
-                value={`$${(profile?.totalDeposited ?? 0).toLocaleString()}`}
-                icon={<TrendingUp size={20} className="text-green-400" />}
-              />
-              <StatCard
-                label="$EMPIRE Earned"
-                value={`${(profile?.totalEmpireEarned ?? 0).toFixed(2)}`}
-                icon={<Zap size={20} className="text-purple-400" />}
-              />
-              <StatCard
-                label="Prestige"
-                value={String(profile?.prestigeCount ?? 0)}
-                icon={<Shield size={20} className="text-pink-400" />}
-              />
-            </div>
+              {/* Protocol Breakdown */}
+              <ProtocolBreakdown totalDeposited={profile?.totalDeposited ?? 0} />
 
-            {/* Protocol Breakdown — even split of totalDeposited across known protocols */}
-            <ProtocolBreakdown totalDeposited={profile?.totalDeposited ?? 0} />
-
-            {/* Achievement Badges */}
-            <div className="bg-game-panel border-2 border-game-border rounded-xl p-6">
-              <h2 className="text-lg font-bold mb-4">Achievements</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {achievements.map((badge) => (
-                  <div
-                    key={badge.label}
-                    className={`border rounded-lg p-3 text-center transition-colors ${
-                      badge.earned
-                        ? 'border-yellow-500/50 bg-yellow-500/10'
-                        : 'border-game-border bg-game-panel opacity-40'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{badge.icon}</div>
-                    <div className="text-xs font-bold uppercase">{badge.label}</div>
-                    <div className="text-xs text-gray-400 mt-1">{badge.description}</div>
+              {/* Achievement Badges */}
+              <RetroCard borderColor="purple">
+                <RetroCardHeader>
+                  <RetroCardTitle>
+                    <Trophy size={16} className="text-gold" />
+                    ACHIEVEMENTS
+                  </RetroCardTitle>
+                </RetroCardHeader>
+                <RetroCardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {achievements.map((badge) => (
+                      <div
+                        key={badge.label}
+                        className={`border rounded-sm p-3 text-center transition-colors ${
+                          badge.earned
+                            ? 'border-gold/50 bg-gold/10'
+                            : 'border-border bg-muted/20 opacity-40'
+                        }`}
+                      >
+                        <div className="text-2xl mb-1">{badge.icon}</div>
+                        <div className="font-pixel text-[8px] text-foreground uppercase">
+                          {badge.label}
+                        </div>
+                        <div className="font-retro text-xs text-muted-foreground mt-1">
+                          {badge.description}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
+                </RetroCardContent>
+              </RetroCard>
+            </>
+          )}
+        </div>
       </main>
-    </div>
-  );
-}
-
-/** Reusable stat card component */
-function StatCard({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="bg-game-panel border-2 border-game-border rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-2">
-        {icon}
-        <span className="text-xs text-gray-400 uppercase">{label}</span>
-      </div>
-      <div className="text-xl font-bold">{value}</div>
     </div>
   );
 }
@@ -253,46 +276,49 @@ function ProtocolBreakdown({ totalDeposited }: { totalDeposited: number }) {
   const maxAmount = Math.max(perProtocol, 1);
 
   return (
-    <div className="bg-game-panel border-2 border-game-border rounded-xl p-6 mb-6">
-      <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-        <Trophy size={18} className="text-yellow-400" />
-        Protocol Breakdown
-      </h2>
-      {totalDeposited === 0 ? (
-        <p className="text-gray-500 text-sm">No deposits yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {PROTOCOL_LIST.map(({ id, color }) => {
-            const config = BUILDING_CONFIGS[id];
-            return (
-              <div key={id} className="flex items-center gap-3">
-                <div
-                  className="w-4 h-4 rounded shrink-0"
-                  style={{ backgroundColor: color }}
-                />
-                <div className="flex-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-bold uppercase">{config.name}</span>
-                    <span className="text-sm text-gray-400">{id}</span>
+    <RetroCard borderColor="purple" className="mb-6">
+      <RetroCardHeader>
+        <RetroCardTitle>
+          <Trophy size={16} className="text-gold" />
+          PROTOCOL BREAKDOWN
+        </RetroCardTitle>
+      </RetroCardHeader>
+      <RetroCardContent>
+        {totalDeposited === 0 ? (
+          <p className="font-retro text-base text-muted-foreground">No deposits yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {PROTOCOL_LIST.map(({ id, color }) => {
+              const config = BUILDING_CONFIGS[id];
+              return (
+                <div key={id} className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: color }} />
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-pixel text-[8px] text-foreground uppercase">
+                        {config.name}
+                      </span>
+                      <span className="font-pixel text-[8px] text-muted-foreground">{id}</span>
+                    </div>
+                    <div className="pixel-progress rounded-sm mt-1">
+                      <div
+                        className="pixel-progress-fill transition-all"
+                        style={{
+                          backgroundColor: color,
+                          width: `${Math.min((perProtocol / maxAmount) * 100, 100)}%`,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full bg-purple-900/50 rounded-full h-2 mt-1">
-                    <div
-                      className="h-2 rounded-full transition-all"
-                      style={{
-                        backgroundColor: color,
-                        width: `${Math.min((perProtocol / maxAmount) * 100, 100)}%`,
-                      }}
-                    />
-                  </div>
+                  <span className="font-pixel text-[10px] text-foreground w-20 text-right">
+                    ${perProtocol.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </span>
                 </div>
-                <span className="text-sm text-gray-300 w-20 text-right">
-                  ${perProtocol.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+              );
+            })}
+          </div>
+        )}
+      </RetroCardContent>
+    </RetroCard>
   );
 }

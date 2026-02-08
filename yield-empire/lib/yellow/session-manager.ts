@@ -304,11 +304,46 @@ export class YellowSessionManager {
   }
 
   /**
+   * Private: Check if the Yellow Network endpoint is reachable before
+   * attempting a WebSocket connection. A 503 means the service is down.
+   */
+  private async checkEndpointHealth(): Promise<void> {
+    // Convert wss:// → https:// for the HTTP health probe
+    const httpUrl = NETWORKS.YELLOW_ENDPOINT
+      .replace('wss://', 'https://')
+      .replace('ws://', 'http://');
+
+    try {
+      const res = await fetch(httpUrl, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (res.status === 503) {
+        throw new Error(
+          'Yellow Network is currently down (503 Service Unavailable). Please try again later.',
+        );
+      }
+      // Other non-success codes: could be 426 (Upgrade Required — normal for WS endpoints)
+      // or 101, which is fine. Only block on 503.
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('503')) {
+        throw err; // Re-throw our specific 503 error
+      }
+      // Network errors (CORS, DNS, etc.) — let the WebSocket attempt proceed
+      // because the HTTP probe may fail due to CORS while WS still works
+    }
+  }
+
+  /**
    * Private: Connect WebSocket
    */
-  private connectWebSocket(): Promise<void> {
+  private async connectWebSocket(): Promise<void> {
     // Ensure any stale socket is fully torn down before opening a new one
     this.cleanupConnection();
+
+    // Pre-flight health check — surfaces a clear "service down" message
+    await this.checkEndpointHealth();
 
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(NETWORKS.YELLOW_ENDPOINT);

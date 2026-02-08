@@ -13,7 +13,7 @@
 import { type Address, type Hash, type PublicClient, type WalletClient } from 'viem';
 import { baseSepolia } from 'wagmi/chains';
 import { PROTOCOL_ADDRESSES } from './addresses';
-import { AAVE_POOL_ABI, AAVE_FAUCET_ABI, ERC20_ABI, TREASURY_ABI } from './abis';
+import { AAVE_POOL_ABI, AAVE_FAUCET_ABI, ERC20_ABI } from './abis';
 
 /**
  * Fetch Aave V3 supply APY from on-chain reserve data.
@@ -48,39 +48,44 @@ export function isTreasuryDeployed(): boolean {
 }
 
 /**
- * Primary path: settle Aave allocation via Treasury Contract.
+ * Primary path: settle Aave allocation via Treasury Relayer API.
  *
- * The treasury holds pre-funded Aave test USDC. On settle, the treasury
- * calls aavePool.supply(aaveUsdc, amount, player, 0) using its own reserves.
- * The player's Circle USDC (already bridged to treasury) serves as collateral.
+ * The treasury holds pre-funded Aave test USDC. On settle, the server-side
+ * relayer (which holds the treasury owner key) calls registerBridgeMint()
+ * if needed, then settle() on the treasury contract.
  *
- * This is an owner-only call on the treasury — the game backend or deployer
- * wallet must sign this. For the hackathon demo, the connected wallet is
- * assumed to be the treasury owner.
+ * This pattern keeps the owner key server-side and works for any user.
+ * The relayer runs at /api/treasury/settle.
  */
 export async function settleAaveViaTreasury(
-  walletClient: WalletClient,
+  _walletClient: WalletClient,
   player: Address,
   amount: bigint,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _publicClient?: PublicClient,
 ): Promise<Hash> {
-  const account = walletClient.account;
-  if (!account) throw new Error('Wallet not connected');
-
   if (!isTreasuryDeployed()) {
     throw new Error('Treasury contract not deployed — set NEXT_PUBLIC_TREASURY_ADDRESS');
   }
 
-  const hash = await walletClient.writeContract({
-    address: TREASURY.BASE_SEPOLIA,
-    abi: TREASURY_ABI,
-    functionName: 'settle',
-    args: [player, amount],
-    chain: baseSepolia,
-    account,
-    gas: BigInt(500_000), // Explicit limit to prevent inflated estimation
+  // Call server-side relayer which signs with the treasury owner key
+  const res = await fetch('/api/treasury/settle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ player, amount: amount.toString() }),
   });
 
-  return hash;
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error ?? `Treasury relayer failed (${res.status})`);
+  }
+
+  if (data.status !== 'confirmed') {
+    throw new Error('Treasury settle transaction failed on-chain');
+  }
+
+  return data.settleHash as Hash;
 }
 
 /**
@@ -139,7 +144,7 @@ export async function supplyToAave(
   if (!account) throw new Error('Wallet not connected');
 
   if (isTreasuryDeployed()) {
-    return settleAaveViaTreasury(walletClient, onBehalfOf ?? account.address, amount);
+    return settleAaveViaTreasury(walletClient, onBehalfOf ?? account.address, amount, publicClient);
   }
 
   return supplyToAaveDirect(walletClient, publicClient, amount, onBehalfOf);

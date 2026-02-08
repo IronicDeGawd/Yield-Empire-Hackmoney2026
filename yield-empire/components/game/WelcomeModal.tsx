@@ -37,9 +37,9 @@ const SLIDES = [
       'Rate source badges show where the rate comes from:',
     ],
     badges: [
-      { label: 'LIVE', color: 'text-green-400', desc: 'Fetched from on-chain contract' },
-      { label: 'EST', color: 'text-yellow-400', desc: 'Estimated from protocol data' },
-      { label: 'SIM', color: 'text-gray-400', desc: 'Simulated for demo purposes' },
+      { label: 'LIVE', color: 'text-neon-green', desc: 'Fetched from on-chain contract' },
+      { label: 'EST', color: 'text-gold', desc: 'Estimated from protocol data' },
+      { label: 'SIM', color: 'text-muted-foreground', desc: 'Simulated for demo purposes' },
     ],
     formula: '$EMPIRE rate = baseAPY \u00d7 (1 + level \u00d7 10%)',
     formulaNote: 'Higher levels = faster $EMPIRE earnings. Level 10 doubles your rate!',
@@ -93,15 +93,15 @@ export function WelcomeModal({ isOpen, onClose, onDontShowAgain }: WelcomeModalP
       />
 
       {/* Dialog */}
-      <div className="relative bg-[#16162a] border border-purple-700/50 rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+      <div className="relative retro-card retro-card-gold w-full max-w-lg mx-4 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-purple-700/30">
-          <h2 className="text-lg font-bold text-yellow-400 uppercase tracking-wider">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="font-pixel text-[10px] text-gold uppercase tracking-wider">
             {slide.title}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <X size={20} />
           </button>
@@ -115,10 +115,10 @@ export function WelcomeModal({ isOpen, onClose, onDontShowAgain }: WelcomeModalP
               onClick={() => setStep(i)}
               className={`w-2.5 h-2.5 rounded-full transition-colors ${
                 i === step
-                  ? 'bg-yellow-400'
+                  ? 'bg-gold'
                   : i < step
-                    ? 'bg-purple-500'
-                    : 'bg-purple-800'
+                    ? 'bg-primary'
+                    : 'bg-secondary'
               }`}
             />
           ))}
@@ -129,7 +129,7 @@ export function WelcomeModal({ isOpen, onClose, onDontShowAgain }: WelcomeModalP
           {/* Text content */}
           <div className="space-y-2">
             {slide.content.map((line, i) => (
-              <p key={i} className="text-sm text-gray-300 leading-relaxed">
+              <p key={i} className="font-retro text-lg text-muted-foreground leading-relaxed">
                 {line}
               </p>
             ))}
@@ -141,7 +141,7 @@ export function WelcomeModal({ isOpen, onClose, onDontShowAgain }: WelcomeModalP
               {slide.buildings.map((b) => (
                 <div key={b.name} className="flex flex-col items-center gap-1">
                   <div
-                    className="w-12 h-12 rounded-lg border-2 flex items-center justify-center bg-purple-900/30"
+                    className="w-12 h-12 rounded-sm border-2 flex items-center justify-center bg-secondary/30"
                     style={{ borderColor: b.color }}
                   >
                     <img
@@ -153,7 +153,7 @@ export function WelcomeModal({ isOpen, onClose, onDontShowAgain }: WelcomeModalP
                       style={{ imageRendering: 'pixelated' }}
                     />
                   </div>
-                  <span className="text-[10px] text-gray-400 font-mono">{b.name}</span>
+                  <span className="font-pixel text-[8px] text-muted-foreground">{b.name}</span>
                 </div>
               ))}
             </div>
@@ -163,11 +163,11 @@ export function WelcomeModal({ isOpen, onClose, onDontShowAgain }: WelcomeModalP
           {'badges' in slide && slide.badges && (
             <div className="space-y-1.5 pt-1">
               {slide.badges.map((badge) => (
-                <div key={badge.label} className="flex items-center gap-2 text-sm">
-                  <span className={`font-mono font-bold text-xs ${badge.color}`}>
+                <div key={badge.label} className="flex items-center gap-2 font-retro text-base">
+                  <span className={`font-pixel text-[8px] font-bold ${badge.color}`}>
                     [{badge.label}]
                   </span>
-                  <span className="text-gray-400">{badge.desc}</span>
+                  <span className="text-muted-foreground">{badge.desc}</span>
                 </div>
               ))}
             </div>
@@ -175,28 +175,28 @@ export function WelcomeModal({ isOpen, onClose, onDontShowAgain }: WelcomeModalP
 
           {/* Slide 2: Formula */}
           {'formula' in slide && slide.formula && (
-            <div className="bg-purple-900/30 rounded-lg px-3 py-2 mt-2">
-              <code className="text-xs text-yellow-300 font-mono">{slide.formula}</code>
+            <div className="bg-secondary/50 rounded-sm px-3 py-2 mt-2 border border-border">
+              <code className="font-pixel text-[8px] text-gold">{slide.formula}</code>
               {slide.formulaNote && (
-                <p className="text-[11px] text-purple-300 mt-1">{slide.formulaNote}</p>
+                <p className="font-retro text-sm text-primary mt-1">{slide.formulaNote}</p>
               )}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-4 border-t border-purple-700/30">
+        <div className="flex items-center justify-between px-5 py-4 border-t border-border">
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="bg-gray-700 hover:bg-gray-600 text-gray-200 font-bold py-2 px-4 rounded-lg border-b-2 border-gray-800 uppercase text-xs tracking-wider transition-colors"
+              className="bracket-btn font-pixel text-[8px] py-2 px-4 text-muted-foreground"
             >
               Skip
             </button>
             {step > 0 && (
               <button
                 onClick={handleBack}
-                className="bg-purple-700 hover:bg-purple-600 text-purple-200 font-bold py-2 px-4 rounded-lg border-b-2 border-purple-800 uppercase text-xs tracking-wider transition-colors"
+                className="bracket-btn bracket-btn-blue font-pixel text-[8px] py-2 px-4"
               >
                 Back
               </button>
@@ -207,14 +207,14 @@ export function WelcomeModal({ isOpen, onClose, onDontShowAgain }: WelcomeModalP
             {isLast && (
               <button
                 onClick={onDontShowAgain}
-                className="bg-purple-800 hover:bg-purple-700 text-purple-300 font-bold py-2 px-3 rounded-lg border-b-2 border-purple-900 uppercase text-[10px] tracking-wider transition-colors"
+                className="bracket-btn font-pixel text-[7px] py-2 px-3 text-muted-foreground"
               >
                 Don&apos;t Show Again
               </button>
             )}
             <button
               onClick={handleNext}
-              className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-2 px-4 rounded-lg border-b-2 border-yellow-700 uppercase text-xs tracking-wider transition-colors flex items-center gap-1"
+              className="arcade-btn arcade-btn-gold font-pixel text-[8px] py-2 px-4 flex items-center gap-1"
             >
               {isLast ? 'Start Playing' : (
                 <>
