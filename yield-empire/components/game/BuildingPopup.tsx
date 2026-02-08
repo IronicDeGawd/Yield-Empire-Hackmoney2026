@@ -14,11 +14,12 @@ interface BuildingPopupProps {
 }
 
 export function BuildingPopup({ entity, screenX, screenY }: BuildingPopupProps) {
-    // Calculate effective APY with level bonus (10% per level)
-    const effectiveAPY = entity.yieldRate * (1 + entity.level * 0.1);
+    // Real protocol APY (no level inflation)
+    const realAPY = entity.yieldRate;
 
-    // Daily yield from this building
-    const dailyYield = (entity.deposited * effectiveAPY) / 100 / 365;
+    // Daily $EMPIRE earning rate (includes level multiplier)
+    const levelMultiplier = 1 + entity.level * 0.1;
+    const dailyEmpire = (entity.deposited * realAPY * levelMultiplier) / 100 / 365;
 
     return (
         <div
@@ -63,12 +64,21 @@ export function BuildingPopup({ entity, screenX, screenY }: BuildingPopupProps) 
                     <div className="flex justify-between items-center">
                         <span className="text-purple-400">APY:</span>
                         <span className="text-green-400 font-bold">
-                            {effectiveAPY.toFixed(1)}%
+                            {realAPY.toFixed(1)}%
                             {entity.rateSource === 'live' && <span className="text-[8px] text-green-300 ml-1">LIVE</span>}
                             {entity.rateSource === 'estimated' && <span className="text-[8px] text-yellow-300 ml-1">EST</span>}
                             {entity.rateSource === 'simulated' && <span className="text-[8px] text-gray-400 ml-1">SIM</span>}
                         </span>
                     </div>
+
+                    {entity.level > 1 && (
+                        <div className="flex justify-between items-center">
+                            <span className="text-purple-400">Boost:</span>
+                            <span className="text-yellow-400 font-bold">
+                                x{levelMultiplier.toFixed(1)} $EMPIRE
+                            </span>
+                        </div>
+                    )}
 
                     <div className="flex justify-between items-center">
                         <span className="text-purple-400">Deposited:</span>
@@ -81,7 +91,7 @@ export function BuildingPopup({ entity, screenX, screenY }: BuildingPopupProps) 
                         <div className="flex justify-between items-center pt-1 border-t border-[#4a3f5c]/50">
                             <span className="text-purple-400">Daily:</span>
                             <span className="text-green-300 font-bold">
-                                +${dailyYield.toFixed(4)}
+                                +{dailyEmpire.toFixed(4)} $EMPIRE
                             </span>
                         </div>
                     )}

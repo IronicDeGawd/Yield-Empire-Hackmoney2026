@@ -429,7 +429,7 @@ export default function GuildPage() {
                         ensName: m.name,
                         empireLevel: 1,
                         totalDeposited: 0,
-                        totalYield: 0,
+                        totalEmpireEarned: 0,
                         prestigeCount: 0,
                       }))
                   ).map((member, i) => (

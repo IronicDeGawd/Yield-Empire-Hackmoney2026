@@ -9,10 +9,10 @@
  * Game loop:
  *   1. Connect wallet → auto-connect Yellow Network → auto-create session
  *   2. Deposit USDC to buildings (allocate to protocols)
- *   3. Upgrade buildings (increase yield multiplier)
- *   4. Compound yields (reinvest accrued yield)
- *   5. Contribute to guild (share yield with guild treasury)
- *   6. Settle → close state channel → execute real protocol txs
+ *   3. Upgrade buildings (costs $EMPIRE tokens)
+ *   4. Compound yields (reinvest deposited USDC)
+ *   5. Contribute $EMPIRE to guild for cooperative bonuses
+ *   6. Settle → close state channel → execute real protocol txs → mint $EMPIRE
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -57,8 +57,8 @@ function calcEmpireLevel(totalDeposited: number, actionCount: number): number {
   return Math.min(1 + depositLevel + actionLevel, 99);
 }
 
-/** Calculate daily yield for an entity based on deposit, rate, and level */
-function entityDailyYield(e: GameEntity): number {
+/** Calculate daily $EMPIRE earning rate for an entity based on deposit, rate, and level */
+function entityDailyEmpire(e: GameEntity): number {
   const levelMultiplier = 1 + e.level * YIELD_MULTIPLIER_PER_LEVEL;
   return (e.deposited * e.yieldRate * levelMultiplier) / 100 / 365;
 }
@@ -69,13 +69,13 @@ export default function GamePage() {
   const [entities, setEntities] = useState<GameEntity[]>(INITIAL_ENTITIES);
   const [selectedEntity, setSelectedEntity] = useState<GameEntity | null>(null);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
-  const [accruedYield, setAccruedYield] = useState(0);
-  const [totalYieldEarned, setTotalYieldEarned] = useState(0);
+  const [empireTokens, setEmpireTokens] = useState(0);
+  const [totalEmpireEarned, setTotalEmpireEarned] = useState(0);
   const [guildContributed, setGuildContributed] = useState(0);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
 
-  // Debounced save ref for yield accrual timer
+  // Debounced save ref for token accrual timer
   const lastSaveRef = useRef(0);
 
   // Retry limit for Yellow Network auto-connect (max 4 attempts)
@@ -100,8 +100,8 @@ export default function GamePage() {
     const saved = loadGameState(address);
     if (saved) {
       setEntities(saved.entities);
-      setAccruedYield(saved.accruedYield);
-      setTotalYieldEarned(saved.totalYieldEarned);
+      setEmpireTokens(saved.empireTokens);
+      setTotalEmpireEarned(saved.totalEmpireEarned);
       setGuildContributed(saved.guildContributed ?? 0);
     }
   }, [address]);
@@ -151,7 +151,7 @@ export default function GamePage() {
         avatar: proxyAvatarUrl(ensAvatar) ?? undefined,
         empireLevel,
         totalDeposited,
-        totalYield: totalYieldEarned,
+        totalEmpireEarned,
         prestigeCount: 0,
       }
       : undefined;
@@ -175,8 +175,8 @@ export default function GamePage() {
     createSession: ysCreateSession,
   } = yellowSession;
 
-  // ── Yield accrual timer ──────────────────────────────────────────────
-  // Accrues yield every 2 seconds (demo speed: 1 tick = ~10 min of real time)
+  // ── $EMPIRE accrual timer ──────────────────────────────────────────────
+  // Accrues $EMPIRE every 2 seconds (demo speed: 1 tick = ~10 min of real time)
   const entitiesRef = useRef(entities);
   entitiesRef.current = entities;
 
@@ -184,36 +184,36 @@ export default function GamePage() {
     if (!ysSessionActive) return;
 
     const interval = setInterval(() => {
-      let tickYield = 0;
+      let tickEmpire = 0;
       for (const e of entitiesRef.current) {
         if (e.deposited > 0) {
-          // Each tick = ~10 minutes worth of yield (720 ticks/day at 2s intervals)
-          tickYield += entityDailyYield(e) / 720;
+          // Each tick = ~10 minutes worth of $EMPIRE (720 ticks/day at 2s intervals)
+          tickEmpire += entityDailyEmpire(e) / 720;
         }
       }
-      if (tickYield > 0) {
-        setAccruedYield((prev) => prev + tickYield);
-        setTotalYieldEarned((prev) => prev + tickYield);
+      if (tickEmpire > 0) {
+        setEmpireTokens((prev) => prev + tickEmpire);
+        setTotalEmpireEarned((prev) => prev + tickEmpire);
 
         // Debounced save: persist to localStorage every 10 seconds
         const now = Date.now();
         if (address && now - lastSaveRef.current > 10_000) {
           lastSaveRef.current = now;
           // Read latest state from refs to avoid stale closures
-          setAccruedYield((ay) => {
-            setTotalYieldEarned((ty) => {
+          setEmpireTokens((et) => {
+            setTotalEmpireEarned((te) => {
               setGuildContributed((gc) => {
                 saveGameState(address, {
                   entities: entitiesRef.current,
-                  accruedYield: ay + tickYield,
-                  totalYieldEarned: ty + tickYield,
+                  empireTokens: et + tickEmpire,
+                  totalEmpireEarned: te + tickEmpire,
                   guildContributed: gc,
                 });
                 return gc;
               });
-              return ty;
+              return te;
             });
-            return ay;
+            return et;
           });
         }
       }
@@ -254,11 +254,11 @@ export default function GamePage() {
     if (!address) return;
     saveGameState(address, {
       entities: entitiesRef.current,
-      accruedYield,
-      totalYieldEarned,
+      empireTokens,
+      totalEmpireEarned,
       guildContributed,
     });
-  }, [address, accruedYield, totalYieldEarned, guildContributed]);
+  }, [address, empireTokens, totalEmpireEarned, guildContributed]);
 
   // ── Game actions ─────────────────────────────────────────────────────
 
@@ -288,16 +288,16 @@ export default function GamePage() {
     }
   }, [yellowSession, persistState]);
 
-  // Upgrade building (costs accrued yield)
+  // Upgrade building (costs $EMPIRE tokens)
   const handleUpgrade = useCallback(async (entityId: string) => {
     const entity = entitiesRef.current.find((e) => e.id === entityId);
     if (!entity) return;
 
     const cost = getUpgradeCost(entity.level);
-    if (accruedYield < cost) return;
+    if (empireTokens < cost) return;
 
-    // Deduct upgrade cost from accrued yield
-    setAccruedYield((prev) => prev - cost);
+    // Deduct upgrade cost from $EMPIRE balance
+    setEmpireTokens((prev) => prev - cost);
     setEntities((prev) =>
       prev.map((e) => (e.id === entityId ? { ...e, level: e.level + 1 } : e))
     );
@@ -310,58 +310,58 @@ export default function GamePage() {
       persistState();
     } catch (err) {
       console.error('Failed to submit upgrade action:', err);
-      // Revert both level and yield cost
-      setAccruedYield((prev) => prev + cost);
+      // Revert both level and token cost
+      setEmpireTokens((prev) => prev + cost);
       setEntities((prev) =>
         prev.map((e) => (e.id === entityId ? { ...e, level: e.level - 1 } : e))
       );
     }
-  }, [yellowSession, entities, accruedYield, persistState]);
+  }, [yellowSession, entities, empireTokens, persistState]);
 
-  // Compound all — reinvest accrued yield across buildings proportionally
+  // Compound all — reinvest $EMPIRE across buildings proportionally
   const handleCompoundAll = useCallback(async () => {
-    if (accruedYield <= 0) return;
+    if (empireTokens <= 0) return;
 
-    const yieldToCompound = accruedYield;
+    const tokensToCompound = empireTokens;
     const totalDep = entities.reduce((s, e) => s + e.deposited, 0);
 
-    // Distribute yield proportionally to each building's share
+    // Distribute tokens proportionally to each building's share
     if (totalDep > 0) {
       setEntities((prev) =>
         prev.map((e) => {
           const share = e.deposited / totalDep;
-          return { ...e, deposited: e.deposited + yieldToCompound * share };
+          return { ...e, deposited: e.deposited + tokensToCompound * share };
         })
       );
     }
-    setAccruedYield(0);
+    setEmpireTokens(0);
 
     try {
       await yellowSession.performAction(
         { type: 'COMPOUND_YIELD' },
-        { entities, accruedYield: yieldToCompound, timestamp: Date.now() }
+        { entities, empireTokens: tokensToCompound, timestamp: Date.now() }
       );
       persistState();
     } catch (err) {
       console.error('Failed to submit compound action:', err);
-      // Revert: remove compounded yield from buildings
+      // Revert: remove compounded amount from buildings
       if (totalDep > 0) {
         setEntities((prev) =>
           prev.map((e) => {
-            const share = e.deposited / (totalDep + yieldToCompound);
-            return { ...e, deposited: e.deposited - yieldToCompound * share };
+            const share = e.deposited / (totalDep + tokensToCompound);
+            return { ...e, deposited: e.deposited - tokensToCompound * share };
           })
         );
       }
-      setAccruedYield(yieldToCompound);
+      setEmpireTokens(tokensToCompound);
     }
-  }, [yellowSession, entities, accruedYield, persistState]);
+  }, [yellowSession, entities, empireTokens, persistState]);
 
   // Contribute to guild
   const handleGuildContribute = useCallback(async (amount: number) => {
-    if (amount <= 0 || amount > accruedYield) return;
+    if (amount <= 0 || amount > empireTokens) return;
 
-    setAccruedYield((prev) => prev - amount);
+    setEmpireTokens((prev) => prev - amount);
     setGuildContributed((prev) => prev + amount);
 
     try {
@@ -372,10 +372,10 @@ export default function GamePage() {
       persistState();
     } catch (err) {
       console.error('Failed to submit guild contribution:', err);
-      setAccruedYield((prev) => prev + amount);
+      setEmpireTokens((prev) => prev + amount);
       setGuildContributed((prev) => prev - amount);
     }
-  }, [yellowSession, entities, accruedYield, guildContributed, persistState]);
+  }, [yellowSession, entities, empireTokens, guildContributed, persistState]);
 
   // Settlement — passes entities for real protocol execution
   const [isSettleConfirmOpen, setIsSettleConfirmOpen] = useState(false);
@@ -390,7 +390,7 @@ export default function GamePage() {
     try {
       const allSucceeded = await yellowSession.settleSession(entities, {
         empireLevel,
-        totalYieldEarned,
+        totalEmpireEarned,
         ensName: ensName ?? undefined,
       });
 
@@ -398,8 +398,8 @@ export default function GamePage() {
         // Only clear persisted state and reset game on full success
         if (address) clearGameState(address);
         setEntities(INITIAL_ENTITIES);
-        setAccruedYield(0);
-        setTotalYieldEarned(0);
+        setEmpireTokens(0);
+        setTotalEmpireEarned(0);
         setGuildContributed(0);
       } else {
         // Partial failure - show which transactions failed, preserve state
@@ -413,7 +413,7 @@ export default function GamePage() {
       console.error('Settlement failed:', err);
       alert('Settlement failed. Please try again.');
     }
-  }, [yellowSession, entities, empireLevel, totalYieldEarned, ensName, address]);
+  }, [yellowSession, entities, empireLevel, totalEmpireEarned, ensName, address]);
 
   // Handle entity click
   const handleEntityClick = (entity: GameEntity) => {
@@ -464,7 +464,7 @@ export default function GamePage() {
             actionCount: yellowSession.actionCount,
             gasSaved: yellowSession.gasSaved,
           }}
-          accruedYield={accruedYield}
+          empireTokens={empireTokens}
           isConnecting={yellowSession.isConnecting}
           isSettling={yellowSession.isSettling}
           connectionError={yellowSession.error}

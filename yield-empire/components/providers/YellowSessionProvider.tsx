@@ -54,7 +54,7 @@ export interface YellowSessionContextValue {
   // Actions
   connect: () => Promise<void>;
   createSession: () => Promise<void>;
-  settleSession: (entities: GameEntity[], meta?: { empireLevel: number; totalYieldEarned: number; ensName?: string }) => Promise<boolean>;
+  settleSession: (entities: GameEntity[], meta?: { empireLevel: number; totalEmpireEarned: number; ensName?: string }) => Promise<boolean>;
   performAction: (action: GameAction, gameState: object) => Promise<void>;
   disconnect: () => void;
 }
@@ -206,7 +206,7 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
    * Transactions are grouped by chain to minimize chain switches.
    * Approve receipts are awaited before supply to prevent race conditions.
    */
-  const settleSession = useCallback(async (entities: GameEntity[], meta?: { empireLevel: number; totalYieldEarned: number; ensName?: string }): Promise<boolean> => {
+  const settleSession = useCallback(async (entities: GameEntity[], meta?: { empireLevel: number; totalEmpireEarned: number; ensName?: string }): Promise<boolean> => {
     if (!managerRef.current || !address || !walletClient || !publicClient) {
       setError('Cannot settle session');
       return false;

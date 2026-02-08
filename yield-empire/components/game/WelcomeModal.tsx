@@ -31,26 +31,26 @@ const SLIDES = [
     ],
   },
   {
-    title: 'How APY Works',
+    title: 'Earn $EMPIRE Tokens',
     content: [
-      'Buildings earn yield based on real protocol rates fetched on-chain.',
-      'Rate source badges tell you where the rate comes from:',
+      'You earn $EMPIRE tokens based on real protocol APY rates.',
+      'Rate source badges show where the rate comes from:',
     ],
     badges: [
       { label: 'LIVE', color: 'text-green-400', desc: 'Fetched from on-chain contract' },
       { label: 'EST', color: 'text-yellow-400', desc: 'Estimated from protocol data' },
       { label: 'SIM', color: 'text-gray-400', desc: 'Simulated for demo purposes' },
     ],
-    formula: 'effectiveAPY = baseAPY \u00d7 (1 + level \u00d7 10%)',
-    formulaNote: 'Upgrading to Level 10 doubles the base rate!',
+    formula: '$EMPIRE rate = baseAPY \u00d7 (1 + level \u00d7 10%)',
+    formulaNote: 'Higher levels = faster $EMPIRE earnings. Level 10 doubles your rate!',
   },
   {
     title: 'Compound & Upgrade',
     content: [
-      'Yield accrues automatically while your session is active.',
-      'Compound All reinvests accrued yield back into buildings proportionally.',
-      'Upgrades cost accrued yield ($5 base, scaling with level).',
-      'Contribute yield to your guild for cooperative bonuses.',
+      '$EMPIRE tokens accrue automatically while your session is active.',
+      'Compound All reinvests $EMPIRE back into buildings proportionally.',
+      'Upgrades cost $EMPIRE tokens (5 base, scaling with level).',
+      'Contribute $EMPIRE to your guild for cooperative bonuses.',
     ],
   },
   {

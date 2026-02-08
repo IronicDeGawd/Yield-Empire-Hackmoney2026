@@ -116,7 +116,7 @@ export async function getPlayerProfile(
     avatar: avatar ?? undefined,
     empireLevel: Number(empireLevel) || 1,
     totalDeposited: Number(totalContribution) || 0,
-    totalYield: 0,
+    totalEmpireEarned: 0,
     prestigeCount: Number(prestigeCount) || 0,
   };
 }

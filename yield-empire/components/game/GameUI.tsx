@@ -5,8 +5,8 @@
  *
  * Phase 5: Full game loop
  *   - Per-building deposit input (allocate USDC to protocol)
- *   - Accrued yield display with compound button
- *   - Guild contribution from accrued yield
+ *   - $EMPIRE token balance display with compound button
+ *   - Guild contribution from $EMPIRE balance
  *   - Connecting/settling loading indicators
  *   - Navigation to guild, leaderboard, settlement, profile
  */
@@ -41,7 +41,7 @@ interface GameUIProps {
   player?: PlayerProfile;
   guild?: GuildProfile;
   session?: SessionState;
-  accruedYield?: number;
+  empireTokens?: number;
   isConnecting?: boolean;
   isSettling?: boolean;
   connectionError?: string | null;
@@ -59,7 +59,7 @@ export function GameUI({
   player,
   guild,
   session,
-  accruedYield = 0,
+  empireTokens = 0,
   isConnecting = false,
   isSettling = false,
   onUpgrade,
@@ -77,7 +77,7 @@ export function GameUI({
 
   // Calculate total stats
   const totalTVL = entities.reduce((sum, e) => sum + e.deposited, 0);
-  const totalYield = entities.reduce(
+  const dailyEmpire = entities.reduce(
     (sum, e) => sum + (e.deposited * e.yieldRate * (1 + e.level * 0.1)) / 100 / 365,
     0,
   );
@@ -151,7 +151,7 @@ export function GameUI({
                   {isConnecting && (
                     <span className="flex items-center gap-1 text-purple-300 ml-2">
                       <Loader2 size={12} className="animate-spin" />
-                      connecting\u2026
+                      connecting{'\u2026'}
                     </span>
                   )}
                 </div>
@@ -208,7 +208,7 @@ export function GameUI({
               {isSettling ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Settling\u2026
+                  Settling{'\u2026'}
                 </>
               ) : totalTVL === 0 ? (
                 '[ No Deposits ]'
@@ -246,13 +246,13 @@ export function GameUI({
                 <span className="text-white font-bold">${totalTVL.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-gray-300">
-                <span>Yield:</span>
-                <span className="text-green-400 font-bold">${totalYield.toFixed(4)}/day</span>
+                <span>$EMPIRE/day:</span>
+                <span className="text-green-400 font-bold">{dailyEmpire.toFixed(4)}</span>
               </div>
-              {accruedYield > 0 && (
+              {empireTokens > 0 && (
                 <div className="flex justify-between text-gray-300">
-                  <span>Accrued:</span>
-                  <span className="text-yellow-300 font-bold">${accruedYield.toFixed(4)}</span>
+                  <span>$EMPIRE:</span>
+                  <span className="text-yellow-300 font-bold">{empireTokens.toFixed(4)}</span>
                 </div>
               )}
               {guild && (
@@ -277,7 +277,7 @@ export function GameUI({
             {/* Compound All */}
             <button
               onClick={onCompoundAll}
-              disabled={accruedYield <= 0 || !session?.isSessionActive}
+              disabled={empireTokens <= 0 || !session?.isSessionActive}
               className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 disabled:from-yellow-800 disabled:to-yellow-900 disabled:text-gray-500 disabled:cursor-not-allowed text-black font-bold py-3 px-4 rounded-lg border-b-4 border-yellow-800 active:border-b-0 active:translate-y-1 transition-all shadow-lg flex items-center justify-between uppercase"
             >
               <span>[ Compound All ]</span>
@@ -285,14 +285,14 @@ export function GameUI({
             </button>
 
             {/* Guild Contribute */}
-            {session?.isSessionActive && accruedYield > 0.001 && (
+            {session?.isSessionActive && empireTokens > 0.001 && (
               <div className="flex gap-1 mt-2">
                 <input
                   type="number"
                   min="0"
                   step="0.01"
-                  max={accruedYield}
-                  placeholder="Yield to guild"
+                  max={empireTokens}
+                  placeholder="$EMPIRE to guild"
                   value={guildAmount}
                   onChange={(e) => setGuildAmount(e.target.value)}
                   aria-label="Amount to contribute to guild"
@@ -348,7 +348,7 @@ export function GameUI({
                   </div>
                 </div>
                 <div className="text-xs text-gray-300 mb-0.5">
-                  {(entity.yieldRate * (1 + entity.level * 0.1)).toFixed(1)}% APY
+                  {entity.yieldRate.toFixed(1)}% APY
                   {entity.rateSource === 'live' && <span className="text-[10px] text-green-400 ml-1">[LIVE]</span>}
                   {entity.rateSource === 'estimated' && <span className="text-[10px] text-yellow-400 ml-1">[EST]</span>}
                   {entity.rateSource === 'simulated' && <span className="text-[10px] text-gray-400 ml-1">[SIM]</span>}
@@ -392,19 +392,19 @@ export function GameUI({
 
                 <button
                   onClick={() => onUpgrade?.(entity.id)}
-                  disabled={!session?.isSessionActive || accruedYield < getUpgradeCost(entity.level)}
+                  disabled={!session?.isSessionActive || empireTokens < getUpgradeCost(entity.level)}
                   className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-yellow-900 disabled:text-gray-500 disabled:cursor-not-allowed text-xs font-bold py-1.5 px-2 rounded border-b-2 border-yellow-800 disabled:border-yellow-900 text-black uppercase"
                   title={
                     !session?.isSessionActive
-                      ? 'Waiting for Yellow session…'
-                      : accruedYield < getUpgradeCost(entity.level)
-                        ? `Need $${getUpgradeCost(entity.level).toFixed(2)} yield — you have $${accruedYield.toFixed(2)}. Deposit USDC first, then wait for yield to accrue.`
-                        : `Spend $${getUpgradeCost(entity.level).toFixed(2)} accrued yield to upgrade`
+                      ? 'Waiting for Yellow session\u2026'
+                      : empireTokens < getUpgradeCost(entity.level)
+                        ? `Need ${getUpgradeCost(entity.level).toFixed(2)} $EMPIRE \u2014 you have ${empireTokens.toFixed(2)}`
+                        : `Spend ${getUpgradeCost(entity.level).toFixed(2)} $EMPIRE to upgrade`
                   }
                 >
                   {!session?.isSessionActive
-                    ? '[ Connecting… ]'
-                    : `[ Upgrade · $${getUpgradeCost(entity.level).toFixed(2)} ]`}
+                    ? '[ Connecting\u2026 ]'
+                    : `[ Upgrade \u00b7 ${getUpgradeCost(entity.level).toFixed(2)} $EMPIRE ]`}
                 </button>
               </div>
             ))}
