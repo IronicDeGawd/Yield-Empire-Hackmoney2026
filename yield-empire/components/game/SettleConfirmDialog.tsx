@@ -47,7 +47,15 @@ export function SettleConfirmDialog({
     (e) => e.deposited > 0 && e.protocol in PROTOCOL_CHAIN_MAP,
   );
   const totalUsdc = settleable.reduce((s, e) => s + e.deposited, 0);
-  const txCount = settleable.length;
+  // Each protocol needs approve + action (2 wallet popups), except aave via treasury (1)
+  const walletPopups = settleable.reduce((count, e) => {
+    if (e.protocol === 'aave') return count + 1; // Treasury path = single tx
+    return count + 2; // approve + supply/swap
+  }, 0);
+  // Count distinct chains for chain switch popups
+  const chainCount = new Set(
+    settleable.map((e) => PROTOCOL_CHAIN_MAP[e.protocol as keyof typeof PROTOCOL_CHAIN_MAP]),
+  ).size;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -123,8 +131,9 @@ export function SettleConfirmDialog({
           <div className="flex items-start gap-2 bg-yellow-900/20 border border-yellow-700/30 rounded-lg px-3 py-2">
             <AlertTriangle size={16} className="text-yellow-500 shrink-0 mt-0.5" />
             <p className="text-xs text-yellow-200">
-              You will be asked to sign <strong>{txCount}</strong> transaction{txCount !== 1 ? 's' : ''} in your wallet.
-              Each protocol settles on its own chain.
+              You will be asked to approve ~<strong>{walletPopups}</strong> wallet signature{walletPopups !== 1 ? 's' : ''}
+              {chainCount > 1 ? ` across ${chainCount} chains` : ''}.
+              This includes token approvals and protocol transactions.
             </p>
           </div>
         </div>

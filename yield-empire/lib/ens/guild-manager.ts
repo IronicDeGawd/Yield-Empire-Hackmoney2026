@@ -195,6 +195,7 @@ export async function setTextRecord(
     abi: PUBLIC_RESOLVER_ABI,
     functionName: 'setText',
     args: [node, key, value],
+    gas: BigInt(150_000), // Explicit limit to prevent inflated estimation
   });
   return hash;
 }
@@ -277,6 +278,7 @@ export async function createGuildMember(
     abi: ENS_REGISTRY_ABI,
     functionName: 'setSubnodeRecord',
     args: [parentNode, labelHash, ownerAddress, contracts.PUBLIC_RESOLVER, BigInt(0)],
+    gas: BigInt(200_000), // Explicit limit to prevent inflated estimation
   });
   return hash;
 }

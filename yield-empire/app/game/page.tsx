@@ -388,17 +388,27 @@ export default function GamePage() {
   const handleSettleConfirmed = useCallback(async () => {
     setIsSettleConfirmOpen(false);
     try {
-      await yellowSession.settleSession(entities, {
+      const allSucceeded = await yellowSession.settleSession(entities, {
         empireLevel,
         totalYieldEarned,
         ensName: ensName ?? undefined,
       });
-      // Clear persisted state and reset game after successful settlement
-      if (address) clearGameState(address);
-      setEntities(INITIAL_ENTITIES);
-      setAccruedYield(0);
-      setTotalYieldEarned(0);
-      setGuildContributed(0);
+
+      if (allSucceeded) {
+        // Only clear persisted state and reset game on full success
+        if (address) clearGameState(address);
+        setEntities(INITIAL_ENTITIES);
+        setAccruedYield(0);
+        setTotalYieldEarned(0);
+        setGuildContributed(0);
+      } else {
+        // Partial failure - show which transactions failed, preserve state
+        const failed = yellowSession.lastSettlement?.transactions
+          .filter(tx => tx.status === 'failed')
+          .map(tx => tx.protocolName)
+          .join(', ');
+        alert(`Some transactions failed: ${failed || 'unknown'}. Your game state has been preserved.`);
+      }
     } catch (err) {
       console.error('Settlement failed:', err);
       alert('Settlement failed. Please try again.');

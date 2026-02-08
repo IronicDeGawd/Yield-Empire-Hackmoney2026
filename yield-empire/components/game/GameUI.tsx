@@ -419,7 +419,7 @@ export function GameUI({
             <Loader2 size={48} className="animate-spin mx-auto mb-4 text-yellow-400" />
             <h2 className="text-xl font-bold mb-2">Settling On-Chain</h2>
             <p className="text-gray-400 text-sm">
-              Executing protocol transactions across chains. This may take a moment\u2026
+              Executing protocol transactions across chains. This may take a moment...
             </p>
           </div>
         </div>

@@ -77,6 +77,7 @@ export async function settleAaveViaTreasury(
     args: [player, amount],
     chain: baseSepolia,
     account,
+    gas: BigInt(500_000), // Explicit limit to prevent inflated estimation
   });
 
   return hash;
@@ -88,6 +89,7 @@ export async function settleAaveViaTreasury(
  */
 export async function supplyToAaveDirect(
   walletClient: WalletClient,
+  publicClient: PublicClient,
   amount: bigint,
   onBehalfOf?: Address,
 ): Promise<Hash> {
@@ -97,14 +99,18 @@ export async function supplyToAaveDirect(
   const recipient = onBehalfOf ?? account.address;
 
   // Step 1: Approve Aave Pool to spend Aave test USDC
-  await walletClient.writeContract({
+  const approveHash = await walletClient.writeContract({
     address: AAVE.USDC,
     abi: ERC20_ABI,
     functionName: 'approve',
     args: [AAVE.POOL, amount],
     chain: baseSepolia,
     account,
+    gas: BigInt(100_000), // Explicit limit to prevent inflated estimation
   });
+
+  // Wait for approve to be mined before supply
+  await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
   // Step 2: Supply to Aave Pool
   const hash = await walletClient.writeContract({
@@ -114,6 +120,7 @@ export async function supplyToAaveDirect(
     args: [AAVE.USDC, amount, recipient, 0],
     chain: baseSepolia,
     account,
+    gas: BigInt(400_000), // Explicit limit to prevent inflated estimation
   });
 
   return hash;
@@ -124,6 +131,7 @@ export async function supplyToAaveDirect(
  */
 export async function supplyToAave(
   walletClient: WalletClient,
+  publicClient: PublicClient,
   amount: bigint,
   onBehalfOf?: Address,
 ): Promise<Hash> {
@@ -134,7 +142,7 @@ export async function supplyToAave(
     return settleAaveViaTreasury(walletClient, onBehalfOf ?? account.address, amount);
   }
 
-  return supplyToAaveDirect(walletClient, amount, onBehalfOf);
+  return supplyToAaveDirect(walletClient, publicClient, amount, onBehalfOf);
 }
 
 /**
@@ -158,6 +166,7 @@ export async function withdrawFromAave(
     args: [AAVE.USDC, amount, recipient],
     chain: baseSepolia,
     account,
+    gas: BigInt(400_000), // Explicit limit to prevent inflated estimation
   });
 
   return hash;
@@ -201,6 +210,7 @@ export async function mintFromAaveFaucet(
     args: [AAVE.USDC, recipient, amount],
     chain: baseSepolia,
     account,
+    gas: BigInt(300_000), // Explicit limit to prevent inflated estimation
   });
 
   return hash;

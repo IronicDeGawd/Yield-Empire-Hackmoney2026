@@ -69,12 +69,20 @@ const mockWalletClient = {
   writeContract: jest.fn().mockResolvedValue('0xTxHash'),
 };
 
+const mockSwitchChainAsync = jest.fn().mockResolvedValue(undefined);
+const mockPublicClient = {
+  readContract: jest.fn().mockResolvedValue(BigInt(0)),
+  waitForTransactionReceipt: jest.fn().mockResolvedValue({ status: 'success' }),
+};
+
 jest.mock('wagmi', () => ({
   useAccount: jest.fn().mockReturnValue({
     address: '0xPlayer0000000000000000000000000000000001',
     isConnected: true,
   }),
   useWalletClient: jest.fn().mockReturnValue({ data: mockWalletClient }),
+  usePublicClient: jest.fn().mockReturnValue(mockPublicClient),
+  useSwitchChain: jest.fn().mockReturnValue({ switchChainAsync: mockSwitchChainAsync }),
 }));
 
 // ----- Test Helpers -----
@@ -129,6 +137,7 @@ beforeEach(() => {
   mockSwapOnUniswap.mockResolvedValue('0xUniswapHash');
   mockSupplyToMorpho.mockResolvedValue('0xMorphoHash');
   mockManagerSettleSession.mockResolvedValue(undefined);
+  mockSwitchChainAsync.mockResolvedValue(undefined);
 });
 
 // ----- D.1: Happy Path Settlement -----
@@ -263,7 +272,7 @@ describe('Phase D.2 — Protocol Routing', () => {
       await result.current.settleSession(entities);
     });
 
-    expect(mockSupplyToCompound).toHaveBeenCalledWith(mockWalletClient, usdToUsdc6(75));
+    expect(mockSupplyToCompound).toHaveBeenCalledWith(mockWalletClient, mockPublicClient, usdToUsdc6(75));
   });
 
   test('aave entity → calls supplyToAave()', async () => {
@@ -276,7 +285,7 @@ describe('Phase D.2 — Protocol Routing', () => {
       await result.current.settleSession(entities);
     });
 
-    expect(mockSupplyToAave).toHaveBeenCalledWith(mockWalletClient, usdToUsdc6(50));
+    expect(mockSupplyToAave).toHaveBeenCalledWith(mockWalletClient, mockPublicClient, usdToUsdc6(50));
   });
 
   test('uniswap entity → calls swapOnUniswap()', async () => {
@@ -289,7 +298,7 @@ describe('Phase D.2 — Protocol Routing', () => {
       await result.current.settleSession(entities);
     });
 
-    expect(mockSwapOnUniswap).toHaveBeenCalledWith(mockWalletClient, usdToUsdc6(25));
+    expect(mockSwapOnUniswap).toHaveBeenCalledWith(mockWalletClient, mockPublicClient, usdToUsdc6(25));
   });
 
   test('curve entity → calls supplyToMorpho() (Liquid Pool maps to Morpho Blue)', async () => {
@@ -302,7 +311,7 @@ describe('Phase D.2 — Protocol Routing', () => {
       await result.current.settleSession(entities);
     });
 
-    expect(mockSupplyToMorpho).toHaveBeenCalledWith(mockWalletClient, usdToUsdc6(60));
+    expect(mockSupplyToMorpho).toHaveBeenCalledWith(mockWalletClient, mockPublicClient, usdToUsdc6(60));
   });
 });
 
@@ -319,7 +328,7 @@ describe('Phase D.3 — USD to USDC Conversion', () => {
       await result.current.settleSession(entities);
     });
 
-    expect(mockSupplyToCompound).toHaveBeenCalledWith(mockWalletClient, BigInt(100_000_000));
+    expect(mockSupplyToCompound).toHaveBeenCalledWith(mockWalletClient, mockPublicClient, BigInt(100_000_000));
   });
 
   test('entity with deposited=0.01 → amount=BigInt(10_000)', async () => {
@@ -332,7 +341,7 @@ describe('Phase D.3 — USD to USDC Conversion', () => {
       await result.current.settleSession(entities);
     });
 
-    expect(mockSupplyToCompound).toHaveBeenCalledWith(mockWalletClient, BigInt(10_000));
+    expect(mockSupplyToCompound).toHaveBeenCalledWith(mockWalletClient, mockPublicClient, BigInt(10_000));
   });
 
   test('entity with deposited=999999.99 → correct bigint', async () => {
@@ -345,7 +354,7 @@ describe('Phase D.3 — USD to USDC Conversion', () => {
       await result.current.settleSession(entities);
     });
 
-    expect(mockSupplyToCompound).toHaveBeenCalledWith(mockWalletClient, BigInt(999_999_990_000));
+    expect(mockSupplyToCompound).toHaveBeenCalledWith(mockWalletClient, mockPublicClient, BigInt(999_999_990_000));
   });
 });
 
@@ -511,6 +520,7 @@ describe('Phase D.5 — Settlement State Management', () => {
     const wagmi = jest.requireMock('wagmi');
     wagmi.useAccount.mockReturnValue({ address: undefined, isConnected: false });
     wagmi.useWalletClient.mockReturnValue({ data: undefined });
+    wagmi.usePublicClient.mockReturnValue(undefined);
 
     const { result } = renderWithProvider();
 
@@ -528,5 +538,6 @@ describe('Phase D.5 — Settlement State Management', () => {
       isConnected: true,
     });
     wagmi.useWalletClient.mockReturnValue({ data: mockWalletClient });
+    wagmi.usePublicClient.mockReturnValue(mockPublicClient);
   });
 });

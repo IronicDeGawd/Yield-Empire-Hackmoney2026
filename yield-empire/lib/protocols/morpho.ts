@@ -7,7 +7,7 @@
  * Per FLOW.md: "morpho.supply(marketParams, 3e6, 0, player, '')"
  */
 
-import { type Address, type Hash, type WalletClient } from 'viem';
+import { type Address, type Hash, type PublicClient, type WalletClient } from 'viem';
 import { sepolia } from 'wagmi/chains';
 import { PROTOCOL_ADDRESSES } from './addresses';
 import { MORPHO_BLUE_ABI, ERC20_ABI } from './abis';
@@ -25,6 +25,7 @@ const { MORPHO, CIRCLE_USDC } = PROTOCOL_ADDRESSES;
  */
 export async function supplyToMorpho(
   walletClient: WalletClient,
+  publicClient: PublicClient,
   amount: bigint,
   onBehalf?: Address,
 ): Promise<Hash> {
@@ -34,14 +35,18 @@ export async function supplyToMorpho(
   const recipient = onBehalf ?? account.address;
 
   // Step 1: Approve Morpho Blue to spend Circle USDC
-  await walletClient.writeContract({
+  const approveHash = await walletClient.writeContract({
     address: CIRCLE_USDC.SEPOLIA,
     abi: ERC20_ABI,
     functionName: 'approve',
     args: [MORPHO.CORE, amount],
     chain: sepolia,
     account,
+    gas: BigInt(100_000), // Explicit limit to prevent inflated estimation
   });
+
+  // Wait for approve to be mined before supply
+  await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
   // Step 2: Supply Circle USDC to Morpho Blue market
   const hash = await walletClient.writeContract({
@@ -63,6 +68,7 @@ export async function supplyToMorpho(
     ],
     chain: sepolia,
     account,
+    gas: BigInt(400_000), // Explicit limit to prevent inflated estimation
   });
 
   return hash;
@@ -100,6 +106,7 @@ export async function withdrawFromMorpho(
     ],
     chain: sepolia,
     account,
+    gas: BigInt(400_000), // Explicit limit to prevent inflated estimation
   });
 
   return hash;
