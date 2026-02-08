@@ -64,16 +64,16 @@ export const STAR_DATA = [
 // layer: 'bg' = behind islands, 'fg' = in front of islands (creates depth)
 // speed: pixels per second along the diagonal
 // startOffset: 0-1 normalized position along the travel path at t=0
+// lane: -1 to 1, perpendicular offset from center diagonal (spreads clouds across screen)
 export const CLOUD_DATA: CloudData[] = [
-  // Background clouds — behind islands
-  { startOffset: 0.1, scale: 2.2, speed: 12, direction: 'tr-bl', layer: 'bg', alpha: 0.55 },
-  { startOffset: 0.5, scale: 2.8, speed: 8,  direction: 'tl-br', layer: 'bg', alpha: 0.45 },
-  { startOffset: 0.8, scale: 1.8, speed: 15, direction: 'tr-bl', layer: 'bg', alpha: 0.6 },
-  { startOffset: 0.3, scale: 2.5, speed: 10, direction: 'tl-br', layer: 'bg', alpha: 0.5 },
-  // Foreground clouds — over islands for depth (slightly more transparent)
-  { startOffset: 0.0, scale: 1.5, speed: 20, direction: 'tl-br', layer: 'fg', alpha: 0.35 },
-  { startOffset: 0.6, scale: 1.8, speed: 18, direction: 'tr-bl', layer: 'fg', alpha: 0.3 },
-  { startOffset: 0.35, scale: 2.0, speed: 14, direction: 'tr-bl', layer: 'fg', alpha: 0.25 },
+  // Background clouds — spread across different lanes, mixed directions
+  { startOffset: 0.1, scale: 2.2, speed: 12, direction: 'tr-bl', layer: 'bg', alpha: 0.75, lane: -0.5 },
+  { startOffset: 0.6, scale: 2.8, speed: 8,  direction: 'tl-br', layer: 'bg', alpha: 0.7, lane: 0.4 },
+  { startOffset: 0.35, scale: 2.0, speed: 10, direction: 'tr-bl', layer: 'bg', alpha: 0.65, lane: 0.7 },
+  // Foreground clouds — spread across lanes, mixed directions
+  { startOffset: 0.0, scale: 1.5, speed: 18, direction: 'tl-br', layer: 'fg', alpha: 0.5, lane: -0.3 },
+  { startOffset: 0.75, scale: 1.8, speed: 15, direction: 'tr-bl', layer: 'fg', alpha: 0.45, lane: 0.5 },
+  { startOffset: 0.45, scale: 1.6, speed: 20, direction: 'tl-br', layer: 'fg', alpha: 0.4, lane: -0.6 },
 ];
 
 export interface StarData {
@@ -90,4 +90,6 @@ export interface CloudData {
   direction: 'tr-bl' | 'tl-br';
   layer: 'bg' | 'fg';
   alpha: number;
+  lane: number; // -1 to 1, perpendicular offset from center
 }
+

@@ -17,7 +17,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { PixiIsometricMap } from '@/components/game/PixiIsometricMap';
+import { PixiIsometricMap, HoverInfo } from '@/components/game/PixiIsometricMap';
+import { BuildingPopup } from '@/components/game/BuildingPopup';
 import { GameUI } from '@/components/game/GameUI';
 import { INITIAL_ENTITIES, INITIAL_CONNECTIONS, YIELD_MULTIPLIER_PER_LEVEL } from '@/lib/constants';
 import { GameEntity, PlayerProfile } from '@/lib/types';
@@ -50,6 +51,7 @@ export default function GamePage() {
   const [accruedYield, setAccruedYield] = useState(0);
   const [totalYieldEarned, setTotalYieldEarned] = useState(0);
   const [guildContributed, setGuildContributed] = useState(0);
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
   // Retry limit for Yellow Network auto-connect (max 4 attempts)
   const MAX_CONNECT_ATTEMPTS = 4;
@@ -77,14 +79,14 @@ export default function GamePage() {
   const player: PlayerProfile | undefined =
     isConnected && address
       ? {
-          address,
-          ensName: ensName ?? undefined,
-          avatar: ensAvatar ?? undefined,
-          empireLevel,
-          totalDeposited,
-          totalYield: totalYieldEarned,
-          prestigeCount: 0,
-        }
+        address,
+        ensName: ensName ?? undefined,
+        avatar: ensAvatar ?? undefined,
+        empireLevel,
+        totalDeposited,
+        totalYield: totalYieldEarned,
+        prestigeCount: 0,
+      }
       : undefined;
 
   // Handle window resize
@@ -307,6 +309,7 @@ export default function GamePage() {
           width={dimensions.width}
           height={dimensions.height}
           onEntityClick={handleEntityClick}
+          onEntityHover={setHoverInfo}
         />
       </div>
 
@@ -340,6 +343,15 @@ export default function GamePage() {
           onGuildContribute={handleGuildContribute}
         />
       </div>
+
+      {/* Building Hover Popup */}
+      {hoverInfo && (
+        <BuildingPopup
+          entity={hoverInfo.entity}
+          screenX={hoverInfo.screenX}
+          screenY={hoverInfo.screenY}
+        />
+      )}
 
       {/* Cross-chain Deposit Modal */}
       <DepositPanel

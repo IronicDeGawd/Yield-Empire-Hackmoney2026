@@ -226,7 +226,7 @@ export function GameUI({
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex justify-between items-end w-full mt-4">
+      <div className="flex-1 flex justify-between items-start w-full mt-4">
         {/* Left Sidebar - Building Cards */}
         <div className="flex flex-col justify-center h-full pb-20 pointer-events-auto">
           <aside className="flex flex-col gap-3 w-64">
@@ -300,7 +300,7 @@ export function GameUI({
         </div>
 
         {/* Right Bottom Info Panel */}
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto max-h-[calc(100vh-200px)] overflow-y-auto">
           <div className="bg-game-panel border-2 border-game-border rounded-xl p-4 text-white w-72 shadow-2xl">
             <div className="space-y-1 mb-4 text-sm font-mono">
               <div className="flex justify-between text-gray-300">
