@@ -421,13 +421,13 @@ export default function GamePage() {
   };
 
   return (
-    <div id="main-content" className="w-full h-screen relative overflow-hidden select-none bg-game-bg">
+    <div id="main-content" className="w-full h-screen relative overflow-hidden select-none bg-background cloud-bg">
       {/* Background Starfield Effect - Pre-computed positions */}
       <div className="absolute inset-0 pointer-events-none">
         {STAR_DATA.map((star, i) => (
           <div
             key={`star-${i}`}
-            className="absolute rounded-full bg-white opacity-60 animate-pulse"
+            className="absolute rounded-full bg-gold opacity-60 animate-twinkle"
             style={{
               top: `${star.y * 100}%`,
               left: `${star.x * 100}%`,
@@ -439,6 +439,7 @@ export default function GamePage() {
         ))}
         {/* Cloud sprites now rendered in Pixi layer */}
       </div>
+      <div className="grid-overlay absolute inset-0 pointer-events-none" />
 
       {/* PixiJS Isometric Game Layer */}
       <div className="absolute inset-0 flex items-center justify-center z-10">
