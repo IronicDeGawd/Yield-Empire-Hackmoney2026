@@ -534,13 +534,6 @@ export class YellowSessionManager {
     try {
       const message: RPCMessage = JSON.parse(event.data);
 
-      // Debug: log all broker responses
-      if (message.err) {
-        console.error('[Yellow WS] broker err:', JSON.stringify(message.err));
-      } else if (message.res) {
-        console.log(`[Yellow WS] broker res method="${message.res[1]}"`, message.res[2]);
-      }
-
       // Extract request ID from either res or err
       let requestId: number | undefined;
       if (message.res) {
