@@ -17,8 +17,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { PixiIsometricMap, HoverInfo } from '@/components/game/PixiIsometricMap';
+import dynamic from 'next/dynamic';
 import { BuildingPopup } from '@/components/game/BuildingPopup';
+import type { HoverInfo } from '@/components/game/PixiIsometricMap';
 import { GameUI } from '@/components/game/GameUI';
 import { SettleConfirmDialog } from '@/components/game/SettleConfirmDialog';
 import { INITIAL_ENTITIES, INITIAL_CONNECTIONS, YIELD_MULTIPLIER_PER_LEVEL, getUpgradeCost } from '@/lib/constants';
@@ -32,6 +33,21 @@ import { DepositPanel } from '@/components/game/DepositPanel';
 import { WelcomeModal } from '@/components/game/WelcomeModal';
 import { proxyAvatarUrl } from '@/lib/ens/guild-manager';
 import { saveGameState, loadGameState, clearGameState } from '@/lib/game-storage';
+
+// Dynamic import with SSR disabled - PixiJS requires browser APIs (WebGL, canvas)
+// This prevents white screen crashes on page refresh by ensuring the component
+// only loads after the browser environment is ready
+const PixiIsometricMap = dynamic(
+  () => import('@/components/game/PixiIsometricMap').then(mod => mod.PixiIsometricMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-gray-500 animate-pulse">Loading game...</div>
+      </div>
+    ),
+  }
+);
 
 /** Calculate empire level from total deposited and action count */
 function calcEmpireLevel(totalDeposited: number, actionCount: number): number {

@@ -3,6 +3,9 @@
 /**
  * PixiApplication - SSR-safe wrapper for PixiJS Application
  * Handles client-side only rendering required by PixiJS
+ * 
+ * IMPORTANT: The container ref must be available before rendering the Application
+ * to avoid passing null to resizeTo, which causes white screen crashes on page refresh.
  */
 
 import { Application, extend } from '@pixi/react';
@@ -21,17 +24,39 @@ interface PixiApplicationProps {
 
 export function PixiApplication({ width, height, children, onInit }: PixiApplicationProps) {
   const [mounted, setMounted] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const appRef = useRef<PixiApp | null>(null);
 
   // SSR guard - PixiJS requires browser APIs (canvas, WebGL)
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Force canvas resize when tab regains focus or visibility
+  // (window resize events don't fire on tab/window switch)
+  useEffect(() => {
+    if (!mounted) return;
+    const forceResize = () => {
+      const app = appRef.current;
+      if (app?.renderer) {
+        app.renderer.resize(window.innerWidth, window.innerHeight);
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') forceResize();
+    };
+    window.addEventListener('focus', forceResize);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', forceResize);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [mounted]);
+
   const handleInit = useCallback(
     (app: PixiApp) => {
       app.renderer.background.alpha = 0;
       app.renderer.background.color = 0x000000;
+      appRef.current = app;
       onInit?.(app);
     },
     [onInit]
@@ -49,19 +74,21 @@ export function PixiApplication({ width, height, children, onInit }: PixiApplica
   }
 
   return (
-    <div ref={containerRef} style={{ width, height }}>
-      <Application
-        className="pixi-canvas"
-        resizeTo={containerRef}
-        backgroundAlpha={0}
-        backgroundColor={0x000000}
-        antialias={false}
-        resolution={1}
-        autoDensity={true}
-        onInit={handleInit}
-      >
-        {children}
-      </Application>
+    <div className="w-full h-full">
+      {typeof window !== 'undefined' && (
+        <Application
+          className="pixi-canvas"
+          resizeTo={window}
+          backgroundAlpha={0}
+          backgroundColor={0x000000}
+          antialias={false}
+          resolution={1}
+          autoDensity={true}
+          onInit={handleInit}
+        >
+          {children}
+        </Application>
+      )}
     </div>
   );
 }

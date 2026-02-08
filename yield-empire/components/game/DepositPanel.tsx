@@ -17,6 +17,7 @@ import { useBridge, type BridgeParams } from '@/hooks/useBridge';
 import { useUsdcBalance } from '@/hooks/useUsdcBalance';
 import { useProgress, type StepKey } from '@/hooks/useProgress';
 import type { BridgeResult } from '@circle-fin/bridge-kit';
+import { arcTestnet } from '@/lib/wagmi-config';
 
 const PENDING_BRIDGE_KEY = 'yield-empire:pending-bridge';
 
@@ -41,6 +42,53 @@ const STEP_ORDER: StepKey[] = ['approving', 'burning', 'waiting-attestation', 'm
 interface DepositPanelProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+/**
+ * Ensure a custom chain (e.g. Arc Testnet) is added to MetaMask before
+ * attempting to switch.  The Circle BridgeKit adapter calls
+ * `walletClient.switchChain()` internally which does NOT fall back to
+ * `wallet_addEthereumChain` – so we must add it ourselves.
+ */
+async function ensureChainInWallet(chainId: number): Promise<void> {
+  // Only Arc Testnet needs manual addition – well-known chains are
+  // already in MetaMask's registry.
+  if (chainId !== arcTestnet.id) return;
+
+  const eth =
+    typeof window !== 'undefined'
+      ? ((window as Record<string, unknown>).ethereum as {
+          request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+        } | undefined)
+      : undefined;
+  if (!eth) return;
+
+  try {
+    // Try switching first – succeeds if the chain was already added.
+    await eth.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: `0x${chainId.toString(16)}` }],
+    });
+  } catch (err: unknown) {
+    const code = (err as { code?: number })?.code;
+    if (code === 4902) {
+      // Chain unknown – add it.
+      await eth.request({
+        method: 'wallet_addEthereumChain',
+        params: [
+          {
+            chainId: `0x${arcTestnet.id.toString(16)}`,
+            chainName: arcTestnet.name,
+            nativeCurrency: arcTestnet.nativeCurrency,
+            rpcUrls: arcTestnet.rpcUrls.default.http,
+            blockExplorerUrls: [arcTestnet.blockExplorers.default.url],
+          },
+        ],
+      });
+    } else {
+      throw err;
+    }
+  }
 }
 
 export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
@@ -127,6 +175,18 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
 
     // Switch wallet to source chain first so approve + burn work
     const srcChainId = CHAINS.find((c) => c.id === fromChain)?.chainId;
+
+    // Pre-register custom chains (e.g. Arc Testnet) with MetaMask so that both
+    // our explicit switchChainAsync calls and the Circle adapter's internal
+    // walletClient.switchChain() work without error 4902.
+    try {
+      if (srcChainId) await ensureChainInWallet(srcChainId);
+      if (destChainId) await ensureChainInWallet(destChainId);
+    } catch {
+      // User rejected adding the chain — abort
+      return;
+    }
+
     if (srcChainId) {
       try {
         await switchChainAsync({ chainId: srcChainId });
@@ -151,22 +211,22 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
 
     try {
       await bridge(params, {
-        onEvent: async (evt) => {
+        onEvent: (evt) => {
           progress.handleEvent(evt);
-
-          // Auto-switch to destination chain when mint step starts
-          const values = evt.values as { state?: string } | undefined;
-          if (destChainId && evt.method === 'mint' && values?.state === 'pending') {
-            try {
-              await switchChainAsync({ chainId: destChainId });
-            } catch {
-              console.warn('Failed to switch to destination chain for mint');
-            }
-          }
         },
       });
+
+      // Safety net: kit.bridge() resolved successfully, meaning the CCTP
+      // transfer completed on-chain.  If the mint-success event was missed
+      // (different shape, timing issue, etc.) ensure the UI reflects completion.
+      if (progress.currentStep !== 'completed') {
+        progress.addLog('Bridge resolved — marking complete.');
+        progress.setCurrentStep('completed');
+      }
     } catch {
-      progress.setCurrentStep('error');
+      if (progress.currentStep !== 'completed') {
+        progress.setCurrentStep('error');
+      }
     }
   }
 
@@ -180,27 +240,33 @@ export function DepositPanel({ isOpen, onClose }: DepositPanelProps) {
 
     const destChainId = CHAINS.find((c) => c.id === toChain)?.chainId;
 
+    // Pre-register Arc Testnet with MetaMask for handleRetry too
+    try {
+      if (destChainId) await ensureChainInWallet(destChainId);
+    } catch {
+      // continue anyway — adapter will retry internally
+    }
+
     progress.reset();
     progress.setCurrentStep('waiting-attestation');
     progress.addLog('Retrying from last successful step\u2026');
 
     try {
       await retry(failedResult, params, {
-        onEvent: async (evt) => {
+        onEvent: (evt) => {
           progress.handleEvent(evt);
-
-          const values = evt.values as { state?: string } | undefined;
-          if (destChainId && evt.method === 'mint' && values?.state === 'pending') {
-            try {
-              await switchChainAsync({ chainId: destChainId });
-            } catch {
-              console.warn('Failed to switch to destination chain for mint');
-            }
-          }
         },
       });
+
+      // Safety net (same as handleBridge)
+      if (progress.currentStep !== 'completed') {
+        progress.addLog('Retry resolved — marking complete.');
+        progress.setCurrentStep('completed');
+      }
     } catch {
-      progress.setCurrentStep('error');
+      if (progress.currentStep !== 'completed') {
+        progress.setCurrentStep('error');
+      }
     }
   }
 

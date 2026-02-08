@@ -39,6 +39,9 @@ export function useProgress() {
     const state: string | undefined = msg?.values?.state;
     const txHash: string | undefined = msg?.values?.txHash;
 
+    // Debug: log every event from BridgeKit so we can diagnose stuck states
+    console.debug('[BridgeKit event]', JSON.stringify({ method, state, txHash }));
+
     if (!method) return;
 
     if (method === 'approve') {
