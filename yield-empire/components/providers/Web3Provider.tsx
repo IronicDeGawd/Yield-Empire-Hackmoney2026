@@ -9,7 +9,7 @@ import { WagmiProvider } from 'wagmi';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
 import { wagmiConfig } from '@/lib/wagmi-config';
 import { YellowSessionProvider } from '@/components/providers/YellowSessionProvider';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import '@rainbow-me/rainbowkit/styles.css';
 
@@ -18,6 +18,18 @@ interface Web3ProviderProps {
 }
 
 export function Web3Provider({ children }: Web3ProviderProps) {
+  // Suppress browser extension errors (e.g. MetaMask) in dev mode
+  useEffect(() => {
+    const handler = (e: ErrorEvent) => {
+      if (e.filename?.startsWith('chrome-extension://')) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('error', handler, true);
+    return () => window.removeEventListener('error', handler, true);
+  }, []);
+
   // Create a client inside the component to avoid SSR issues
   const [queryClient] = useState(
     () =>
