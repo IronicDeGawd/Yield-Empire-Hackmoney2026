@@ -158,12 +158,11 @@ function IsometricScene({
     [width, height]
   );
 
-  useTick(
-    (ticker) => {
-      // Guard against operations after unmount (prevents crashes on page refresh)
-      if (isUnmounted.current) return;
+  useTick((ticker) => {
+    // Guard against operations after unmount (prevents crashes on page refresh)
+    if (isUnmounted.current || !tickerEnabled) return;
 
-      timeRef.current += ticker.deltaTime / 60;
+    timeRef.current += ticker.deltaTime / 60;
       const dt = ticker.deltaTime / 60;
 
       // Advance cloud offsets and update container positions
@@ -242,9 +241,7 @@ function IsometricScene({
           }
         }
       }
-    },
-    { isEnabled: tickerEnabled }
-  );
+  });
 
   const bgClouds = useMemo(() => {
     const result: { cloud: CloudData; index: number }[] = [];
