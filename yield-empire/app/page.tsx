@@ -5,6 +5,7 @@
  * Retro pixel-art hero with animated preview and call to action
  */
 
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Coins, Shield, Swords } from 'lucide-react';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
@@ -45,6 +46,18 @@ export default function Home() {
       {/* Hero Section */}
       <main id="main-content" className="relative pt-28 pb-16 px-4">
         <div className="max-w-5xl mx-auto text-center relative z-10">
+          {/* Logo */}
+          <div className="mb-6">
+            <Image
+              src="/logo.png"
+              alt="Yield Empire"
+              width={140}
+              height={140}
+              className="mx-auto rounded-full drop-shadow-[0_0_20px_rgba(255,215,0,0.3)]"
+              priority
+            />
+          </div>
+
           {/* Tagline */}
           <div className="mb-4">
             <span className="font-pixel text-[10px] text-gold uppercase tracking-widest">

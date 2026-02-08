@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
@@ -29,9 +30,14 @@ export const RetroNav = () => {
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded bg-gold/20 border-2 border-gold flex items-center justify-center">
-              <span className="font-pixel text-gold text-[8px]">YE</span>
-            </div>
+            <Image
+              src="/logo.png"
+              alt="Yield Empire"
+              width={36}
+              height={36}
+              className="rounded-full"
+              priority
+            />
             <span className="font-pixel text-[10px] text-foreground hidden sm:block">
               YIELD<span className="text-gold">EMPIRE</span>
             </span>
