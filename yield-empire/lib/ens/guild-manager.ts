@@ -276,6 +276,11 @@ export async function fetchGuildMembers(
       }),
     });
 
+    if (!response.ok) {
+      console.error(`ENS subgraph returned ${response.status}`);
+      return [];
+    }
+
     const { data } = await response.json();
     const domains: SubgraphDomain[] = data?.domains || [];
 
