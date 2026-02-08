@@ -51,6 +51,10 @@ export default function GamePage() {
   const [totalYieldEarned, setTotalYieldEarned] = useState(0);
   const [guildContributed, setGuildContributed] = useState(0);
 
+  // Retry limit for Yellow Network auto-connect (max 4 attempts)
+  const MAX_CONNECT_ATTEMPTS = 4;
+  const connectAttemptsRef = useRef(0);
+
   // Wallet connection
   const { address, isConnected } = useAccount();
 
@@ -127,15 +131,23 @@ export default function GamePage() {
     return () => clearInterval(interval);
   }, [ysSessionActive]);
 
-  // ── Auto-connect to Yellow Network ───────────────────────────────────
+  // ── Auto-connect to Yellow Network (max 4 attempts) ────────────────
 
   useEffect(() => {
-    if (isConnected && !ysConnected && !ysConnecting) {
+    if (isConnected && !ysConnected && !ysConnecting && connectAttemptsRef.current < MAX_CONNECT_ATTEMPTS) {
+      connectAttemptsRef.current++;
       ysConnect().catch((err) => {
-        console.error('Failed to connect to Yellow Network:', err);
+        console.error(`Yellow Network connect attempt ${connectAttemptsRef.current}/${MAX_CONNECT_ATTEMPTS} failed:`, err);
       });
     }
   }, [isConnected, ysConnected, ysConnecting, ysConnect]);
+
+  // Reset attempt counter on successful connection
+  useEffect(() => {
+    if (ysConnected) {
+      connectAttemptsRef.current = 0;
+    }
+  }, [ysConnected]);
 
   // Auto-create session after Yellow Network connects
   useEffect(() => {
@@ -315,6 +327,7 @@ export default function GamePage() {
           isSettling={yellowSession.isSettling}
           connectionError={yellowSession.error}
           onRetryConnect={() => {
+            connectAttemptsRef.current = 0;
             ysConnect().catch((err) => {
               console.error('Retry connection failed:', err);
             });

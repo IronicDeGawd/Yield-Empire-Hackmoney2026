@@ -125,15 +125,7 @@ export class YellowSessionManager {
       this.isConnecting = false;
       this.emitState();
     } catch (error) {
-      // Clean up ping interval and WebSocket on failed connect/auth
-      if (this.pingInterval) {
-        clearInterval(this.pingInterval);
-        this.pingInterval = null;
-      }
-      if (this.ws) {
-        this.ws.close();
-        this.ws = null;
-      }
+      this.cleanupConnection();
       this.isConnecting = false;
       this.emitState();
       throw error;
@@ -144,16 +136,7 @@ export class YellowSessionManager {
    * Disconnect and cleanup
    */
   disconnect(): void {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
-    }
-
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-
+    this.cleanupConnection();
     this.isAuthenticated = false;
     this.isSessionActive = false;
     this.appSessionId = null;
@@ -300,40 +283,65 @@ export class YellowSessionManager {
   }
 
   /**
+   * Private: Tear down WebSocket + ping without triggering reconnect side effects
+   */
+  private cleanupConnection(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+    if (this.ws) {
+      // Detach handlers so the closing socket can't interfere with future connections
+      this.ws.onopen = null;
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.onmessage = null;
+      this.ws.close();
+      this.ws = null;
+    }
+    this.requestHandlers.clear();
+  }
+
+  /**
    * Private: Connect WebSocket
    */
   private connectWebSocket(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(NETWORKS.YELLOW_ENDPOINT);
+    // Ensure any stale socket is fully torn down before opening a new one
+    this.cleanupConnection();
 
-      this.ws.onopen = () => {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(NETWORKS.YELLOW_ENDPOINT);
+      this.ws = ws;
+
+      ws.onopen = () => {
         this.startPingInterval();
         resolve();
       };
 
-      this.ws.onerror = (error) => {
+      ws.onerror = () => {
         reject(new Error('WebSocket connection failed'));
       };
 
-      this.ws.onmessage = (event) => {
+      ws.onmessage = (event) => {
         this.handleMessage(event);
       };
 
-      this.ws.onclose = () => {
+      ws.onclose = () => {
+        // Only act if this is still the active socket
+        if (this.ws !== ws) return;
+
         if (this.pingInterval) {
           clearInterval(this.pingInterval);
           this.pingInterval = null;
         }
 
-        // Clear all pending request handlers to prevent closure leaks
         this.requestHandlers.clear();
-
         this.emitState();
       };
 
       // Timeout after 10 seconds
       setTimeout(() => {
-        if (this.ws?.readyState !== WebSocket.OPEN) {
+        if (ws.readyState !== WebSocket.OPEN) {
           reject(new Error('WebSocket connection timeout'));
         }
       }, 10000);
@@ -437,6 +445,15 @@ export class YellowSessionManager {
           return;
         }
 
+        // Broker sometimes returns errors as res with method="error"
+        if (response.res && response.res[1] === 'error') {
+          const errorData = response.res[2];
+          const errMsg = typeof errorData === 'string' ? errorData
+            : errorData?.message ?? errorData?.error ?? JSON.stringify(errorData);
+          reject(new Error(`Yellow Network error: ${errMsg}`));
+          return;
+        }
+
         if (response.res && response.res[1] === expectedMethod) {
           // Return raw response string for SDK parsers
           resolve(JSON.stringify(response));
@@ -481,6 +498,15 @@ export class YellowSessionManager {
           return;
         }
 
+        // Broker sometimes returns errors as res with method="error"
+        if (response.res && response.res[1] === 'error') {
+          const errorData = response.res[2];
+          const errMsg = typeof errorData === 'string' ? errorData
+            : errorData?.message ?? errorData?.error ?? JSON.stringify(errorData);
+          reject(new Error(`Yellow Network error: ${errMsg}`));
+          return;
+        }
+
         if (response.res && response.res[1] === expectedMethod) {
           resolve(response.res[2] as T); // Return result
         } else {
@@ -501,6 +527,13 @@ export class YellowSessionManager {
   private handleMessage(event: MessageEvent): void {
     try {
       const message: RPCMessage = JSON.parse(event.data);
+
+      // Debug: log all broker responses
+      if (message.err) {
+        console.error('[Yellow WS] broker err:', JSON.stringify(message.err));
+      } else if (message.res) {
+        console.log(`[Yellow WS] broker res method="${message.res[1]}"`, message.res[2]);
+      }
 
       // Extract request ID from either res or err
       let requestId: number | undefined;
