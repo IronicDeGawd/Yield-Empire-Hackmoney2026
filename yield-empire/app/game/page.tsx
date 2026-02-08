@@ -32,7 +32,7 @@ import { useProtocolRates } from '@/hooks/useProtocolRates';
 import { DepositPanel } from '@/components/game/DepositPanel';
 import { WelcomeModal } from '@/components/game/WelcomeModal';
 import { proxyAvatarUrl } from '@/lib/ens/guild-manager';
-import { saveGameState, loadGameState, clearGameState } from '@/lib/game-storage';
+import { saveGameState, loadGameState } from '@/lib/game-storage';
 
 // Dynamic import with SSR disabled - PixiJS requires browser APIs (WebGL, canvas)
 // This prevents white screen crashes on page refresh by ensuring the component
@@ -67,7 +67,6 @@ export default function GamePage() {
   const router = useRouter();
   const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
   const [entities, setEntities] = useState<GameEntity[]>(INITIAL_ENTITIES);
-  const [selectedEntity, setSelectedEntity] = useState<GameEntity | null>(null);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [empireTokens, setEmpireTokens] = useState(0);
   const [totalEmpireEarned, setTotalEmpireEarned] = useState(0);
@@ -205,7 +204,11 @@ export default function GamePage() {
   // ── $EMPIRE accrual timer ──────────────────────────────────────────────
   // Accrues $EMPIRE every 2 seconds (demo speed: 1 tick = ~10 min of real time)
   const entitiesRef = useRef(entities);
-  entitiesRef.current = entities;
+
+  // Update ref in useEffect to avoid accessing ref during render
+  useEffect(() => {
+    entitiesRef.current = entities;
+  }, [entities]);
 
   useEffect(() => {
     if (!ysSessionActive) return;
@@ -250,7 +253,7 @@ export default function GamePage() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [ysSessionActive, address]);
+  }, [ysSessionActive, address, pushEffect]);
 
   // ── Auto-connect to Yellow Network (max 4 attempts) ────────────────
 
@@ -360,7 +363,7 @@ export default function GamePage() {
         prev.map((e) => (e.id === entityId ? { ...e, level: e.level - 1 } : e))
       );
     }
-  }, [yellowSession, entities, empireTokens, persistState]);
+  }, [yellowSession, entities, empireTokens, persistState, pushEffect]);
 
   // Compound all — reinvest $EMPIRE across buildings proportionally
   const handleCompoundAll = useCallback(async () => {
@@ -402,7 +405,7 @@ export default function GamePage() {
       }
       setEmpireTokens(tokensToCompound);
     }
-  }, [yellowSession, entities, empireTokens, persistState]);
+  }, [yellowSession, entities, empireTokens, persistState, pushEffect]);
 
   // Contribute to guild
   const handleGuildContribute = useCallback(async (amount: number) => {
@@ -445,12 +448,13 @@ export default function GamePage() {
         // Trigger settle confetti effect
         pushEffect('settle-confetti', undefined, 2.5);
 
-        // Only clear persisted state and reset game on full success
-        if (address) clearGameState(address);
-        setEntities(INITIAL_ENTITIES);
+        // Reset session tracking but KEEP deposited amounts and building levels
+        // (your funds are now on-chain in real protocols!)
         setEmpireTokens(0);
         setTotalEmpireEarned(0);
-        setGuildContributed(0);
+        // Keep entities (deposits + levels) - they persist on-chain
+        // Persist the current state with reset empire tokens
+        persistState();
       } else {
         // Partial failure - show which transactions failed, preserve state
         const failed = yellowSession.lastSettlement?.transactions
@@ -463,11 +467,12 @@ export default function GamePage() {
       console.error('Settlement failed:', err);
       alert('Settlement failed. Please try again.');
     }
-  }, [yellowSession, entities, empireLevel, totalEmpireEarned, ensName, address]);
+  }, [yellowSession, entities, empireLevel, totalEmpireEarned, ensName, persistState, pushEffect]);
 
   // Handle entity click
   const handleEntityClick = (entity: GameEntity) => {
-    setSelectedEntity(entity);
+    // Currently only used for hover info - could add click actions later
+    console.log('Entity clicked:', entity.name);
   };
 
   return (
