@@ -129,3 +129,19 @@ export interface Quest {
   progress: number; // Current amount
   completed: boolean;
 }
+
+// Game effect types for particle animations
+export type GameEffectType =
+  | 'upgrade-sparkle'
+  | 'compound-flow'
+  | 'settle-confetti'
+  | 'token-earn';
+
+// Game effect for triggering PixiJS particle animations
+export interface GameEffect {
+  id: string;          // unique, e.g. `upgrade-${entityId}-${Date.now()}`
+  type: GameEffectType;
+  entityId?: string;   // target building (upgrade, token-earn)
+  startTime: number;   // set to -1 = "not started"; PixiJS sets it to current time on first frame
+  duration: number;    // seconds
+}
