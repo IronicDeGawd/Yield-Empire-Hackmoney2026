@@ -140,6 +140,23 @@ export async function resolveAddress(
 }
 
 /**
+ * Rewrite euc.li avatar URLs to use the Next.js rewrite proxy,
+ * avoiding CORS errors when loading images client-side.
+ */
+export function proxyAvatarUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'euc.li') {
+      return `/api/ens-avatar${parsed.pathname}`;
+    }
+  } catch {
+    // Not a valid URL — return as-is
+  }
+  return url;
+}
+
+/**
  * Get ENS avatar URL for a name.
  */
 export async function getAvatar(
@@ -150,7 +167,7 @@ export async function getAvatar(
     const avatar = await publicClient.getEnsAvatar({
       name: normalize(name),
     });
-    return avatar;
+    return proxyAvatarUrl(avatar);
   } catch (error) {
     console.error(`Failed to get avatar for ${name}:`, error);
     return null;

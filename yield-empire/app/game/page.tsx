@@ -29,6 +29,7 @@ import { STAR_DATA } from '@/components/game/pixi/effects/Starfield';
 import { useYellowSession } from '@/hooks/useYellowSession';
 import { useProtocolRates } from '@/hooks/useProtocolRates';
 import { DepositPanel } from '@/components/game/DepositPanel';
+import { proxyAvatarUrl } from '@/lib/ens/guild-manager';
 
 /** Calculate empire level from total deposited and action count */
 function calcEmpireLevel(totalDeposited: number, actionCount: number): number {
@@ -102,7 +103,7 @@ export default function GamePage() {
       ? {
         address,
         ensName: ensName ?? undefined,
-        avatar: ensAvatar ?? undefined,
+        avatar: proxyAvatarUrl(ensAvatar) ?? undefined,
         empireLevel,
         totalDeposited,
         totalYield: totalYieldEarned,
