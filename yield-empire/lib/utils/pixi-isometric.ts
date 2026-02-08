@@ -8,6 +8,7 @@ import { Graphics } from 'pixi.js';
 // Tile dimensions for isometric grid (matching SVG implementation)
 export const TILE_WIDTH = 200;
 export const TILE_HEIGHT = 100;
+export const GRID_SPACING = 1.25;
 export const BLOCK_HEIGHT = 35;
 
 export interface IsoPoint {
@@ -24,8 +25,8 @@ export function gridToScreen(
   origin: IsoPoint
 ): IsoPoint {
   return {
-    x: (gridX - gridY) * (TILE_WIDTH / 2) + origin.x,
-    y: (gridX + gridY) * (TILE_HEIGHT / 2) + origin.y,
+    x: (gridX - gridY) * (TILE_WIDTH / 2) * GRID_SPACING + origin.x,
+    y: (gridX + gridY) * (TILE_HEIGHT / 2) * GRID_SPACING + origin.y,
   };
 }
 

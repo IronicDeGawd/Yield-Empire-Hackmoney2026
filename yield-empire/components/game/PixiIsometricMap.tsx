@@ -7,27 +7,22 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Graphics } from 'pixi.js';
+import { Container as PixiContainerClass, Graphics } from 'pixi.js';
 import { useTick } from '@pixi/react';
 import { PixiApplication } from './pixi/PixiApplication';
 import { GameEntity, Connection } from '@/lib/types';
 import {
   gridToScreen,
   sortByDepth,
-  adjustColorNum,
-  hexToNum,
-  TILE_WIDTH,
   TILE_HEIGHT,
+  BLOCK_HEIGHT,
+  GRID_SPACING,
   type IsoPoint,
 } from '@/lib/utils/pixi-isometric';
-import { COLORS } from '@/lib/constants';
-import { drawPlatform } from './pixi/buildings/Platform';
-import { drawCrystalBuilding } from './pixi/buildings/CrystalBuilding';
-import { drawFactoryBuilding } from './pixi/buildings/FactoryBuilding';
-import { drawBankBuilding } from './pixi/buildings/BankBuilding';
-import { drawBridge } from './pixi/Bridge';
 import { drawSmokeParticles } from './pixi/effects/SmokeParticles';
 import { drawCrystalGlow } from './pixi/effects/GlowEffect';
+import { type GameSpriteTextures, loadGameSpriteTextures } from './pixi/assets';
+import { CLOUD_DATA, type CloudData } from './pixi/effects/Starfield';
 
 interface PixiIsometricMapProps {
   entities: GameEntity[];
@@ -47,7 +42,8 @@ function IsometricScene({
   width,
   height,
   onEntityClick,
-}: PixiIsometricMapProps) {
+  textures,
+}: PixiIsometricMapProps & { textures: GameSpriteTextures }) {
   const timeRef = useRef(0);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
@@ -55,8 +51,11 @@ function IsometricScene({
   const effectsRef = useRef<Graphics | null>(null);
 
   // Center of the canvas
+  const MAP_OFFSET_X = 0;
+  const MAP_OFFSET_Y = -10;
+
   const origin = useMemo<IsoPoint>(
-    () => ({ x: width / 2, y: height / 2 }),
+    () => ({ x: width / 2 + MAP_OFFSET_X, y: height / 2 + MAP_OFFSET_Y }),
     [width, height]
   );
 
@@ -85,7 +84,7 @@ function IsometricScene({
       const pos = gridToScreen(entity.position.x, entity.position.y, origin);
 
       if (entity.type === 'factory') {
-        drawSmokeParticles(g, pos.x, pos.y, timeRef.current);
+        drawSmokeParticles(g, pos.x, pos.y + 18, timeRef.current);
       }
 
       if (entity.type === 'crystal') {
@@ -94,117 +93,231 @@ function IsometricScene({
     });
   });
 
-  // Draw all bridges
-  const drawBridges = useCallback(
-    (g: Graphics) => {
-      g.clear();
-      connections.forEach((conn) => {
-        const start = entityPositions.get(conn.from);
-        const end = entityPositions.get(conn.to);
-        if (start && end) {
-          drawBridge(g, start, end);
-        }
-      });
-    },
-    [connections, entityPositions]
-  );
+  const isTopLeftBridge = useCallback((fromId: string, toId: string) => {
+    const key = [fromId, toId].sort().join('-');
+    return key === 'e1-e2' || key === 'e3-e4';
+  }, []);
 
-  // Draw hover highlight on platform top face
-  const drawHoverHighlight = useCallback(
-    (g: Graphics, entity: GameEntity) => {
-      g.clear();
-      if (hoveredId !== entity.id) return;
-
-      const pos = gridToScreen(entity.position.x, entity.position.y, origin);
-      const baseColor = hexToNum(COLORS.islandBase);
-      const highlightColor = adjustColorNum(baseColor, 40);
-
-      const w = TILE_WIDTH / 2;
-      const h = TILE_HEIGHT / 2;
-
-      // Bright overlay on top face
-      g.poly([
-        { x: pos.x, y: pos.y - h },
-        { x: pos.x + w, y: pos.y },
-        { x: pos.x, y: pos.y + h },
-        { x: pos.x - w, y: pos.y },
-      ]);
-      g.fill({ color: highlightColor, alpha: 0.3 });
-
-      // White border highlight
-      g.poly([
-        { x: pos.x, y: pos.y - h },
-        { x: pos.x + w, y: pos.y },
-        { x: pos.x, y: pos.y + h },
-        { x: pos.x - w, y: pos.y },
-      ]);
-      g.stroke({ color: 0xffffff, alpha: 0.5, width: 2 });
-    },
-    [hoveredId, origin]
-  );
-
-  // Draw a single entity (platform + building)
-  const drawEntity = useCallback(
-    (g: Graphics, entity: GameEntity) => {
-      g.clear();
-      const pos = gridToScreen(entity.position.x, entity.position.y, origin);
-
-      // Draw platform base
-      drawPlatform(g, pos.x, pos.y);
-
-      // Draw building based on type
-      switch (entity.type) {
-        case 'crystal':
-          drawCrystalBuilding(g, pos.x, pos.y, entity.color);
-          break;
-        case 'factory':
-          drawFactoryBuilding(g, pos.x, pos.y, entity.color);
-          break;
-        case 'bank':
-          drawBankBuilding(g, pos.x, pos.y, entity.color);
-          break;
+  const getBuildingTexture = useCallback(
+    (entity: GameEntity) => {
+      if (entity.type === 'crystal') return textures.shard;
+      if (entity.type === 'bank') return textures.treasury;
+      if (entity.type === 'factory') {
+        return entity.protocol === 'uniswap' ? textures.building1 : textures.building2;
       }
+      return textures.building1;
     },
-    [origin]
+    [textures]
   );
+
+  const PLATFORM_SPRITE_HEIGHT = 112;
+  const BUILDING_SPRITE_SIZE = 64;
+  const PLATFORM_SPRITE_SCALE =
+    ((TILE_HEIGHT + BLOCK_HEIGHT) / PLATFORM_SPRITE_HEIGHT) * 1.75;
+  const BUILDING_SPRITE_SCALE = ((TILE_HEIGHT * 1.2) / BUILDING_SPRITE_SIZE) * 0.75;
+  const BUILDING_HOVER_SCALE = 1.08;
+  const BRIDGE_SPRITE_HEIGHT = 48;
+  const BRIDGE_SPRITE_SCALE = (TILE_HEIGHT / BRIDGE_SPRITE_HEIGHT) * 0.9 * GRID_SPACING;
+  const BRIDGE_OFFSET_Y = -8;
+  const PLATFORM_BASE_OFFSET_Y = TILE_HEIGHT / 2 + BLOCK_HEIGHT;
+  const BUILDING_BASE_OFFSET_Y = -20;
+
+  // Cloud animation — imperatively updated each frame via container refs
+  const cloudContainerRefs = useRef<(PixiContainerClass | null)[]>(
+    new Array(CLOUD_DATA.length).fill(null)
+  );
+  const cloudOffsets = useRef(CLOUD_DATA.map((c) => c.startOffset));
+
+  // Compute cloud pixel position from normalized offset
+  const getCloudPos = useCallback(
+    (cloud: CloudData, offset: number) => {
+      const margin = 200;
+      if (cloud.direction === 'tr-bl') {
+        return {
+          x: (width + margin) * (1 - offset) - margin / 2,
+          y: (height + margin) * offset - margin / 2,
+        };
+      }
+      return {
+        x: (width + margin) * offset - margin / 2,
+        y: (height + margin) * offset - margin / 2,
+      };
+    },
+    [width, height]
+  );
+
+  useTick((ticker) => {
+    timeRef.current += ticker.deltaTime / 60;
+    const dt = ticker.deltaTime / 60;
+
+    // Advance cloud offsets and update container positions
+    const diagonal = Math.sqrt(width * width + height * height);
+    CLOUD_DATA.forEach((cloud, i) => {
+      const normalizedSpeed = cloud.speed / diagonal;
+      cloudOffsets.current[i] += normalizedSpeed * dt;
+      if (cloudOffsets.current[i] > 1.15) {
+        cloudOffsets.current[i] = -0.15;
+      }
+      const container = cloudContainerRefs.current[i];
+      if (container) {
+        const pos = getCloudPos(cloud, cloudOffsets.current[i]);
+        container.x = pos.x;
+        container.y = pos.y;
+      }
+    });
+
+    // Redraw effects (smoke, glow)
+    const g = effectsRef.current;
+    if (!g) return;
+    g.clear();
+
+    sortedEntities.forEach((entity) => {
+      const pos = gridToScreen(entity.position.x, entity.position.y, origin);
+      if (entity.type === 'factory') {
+        drawSmokeParticles(g, pos.x, pos.y + 18, timeRef.current);
+      }
+      if (entity.type === 'crystal') {
+        drawCrystalGlow(g, pos.x, pos.y, entity.color, timeRef.current);
+      }
+    });
+  });
+
+  const bgClouds = useMemo(() => {
+    const result: { cloud: CloudData; index: number }[] = [];
+    CLOUD_DATA.forEach((c, i) => { if (c.layer === 'bg') result.push({ cloud: c, index: i }); });
+    return result;
+  }, []);
+  const fgClouds = useMemo(() => {
+    const result: { cloud: CloudData; index: number }[] = [];
+    CLOUD_DATA.forEach((c, i) => { if (c.layer === 'fg') result.push({ cloud: c, index: i }); });
+    return result;
+  }, []);
 
   return (
     <>
-      {/* Bridges layer (rendered first, behind everything) */}
-      <pixiGraphics draw={drawBridges} />
-
-      {/* Entities layer (platforms + buildings, depth sorted) */}
-      {sortedEntities.map((entity) => (
+      {/* Background clouds — behind islands */}
+      {bgClouds.map(({ cloud, index }) => (
         <pixiContainer
-          key={entity.id}
-          eventMode="static"
-          cursor="pointer"
-          onPointerDown={() => onEntityClick?.(entity)}
-          onPointerEnter={() => setHoveredId(entity.id)}
-          onPointerLeave={() =>
-            setHoveredId((prev) => (prev === entity.id ? null : prev))
-          }
+          key={`cloud-bg-${index}`}
+          ref={(node: PixiContainerClass | null) => { cloudContainerRefs.current[index] = node; }}
         >
-          <pixiGraphics draw={(g: Graphics) => drawEntity(g, entity)} />
-          <pixiGraphics
-            draw={(g: Graphics) => drawHoverHighlight(g, entity)}
+          <pixiSprite
+            texture={cloud.direction === 'tr-bl' ? textures.cloud1 : textures.cloud2}
+            anchor={{ x: 0.5, y: 0.5 }}
+            scale={{ x: cloud.scale, y: cloud.scale }}
+            alpha={cloud.alpha}
           />
         </pixiContainer>
       ))}
 
-      {/* Animated effects layer (smoke, glow — redrawn each frame by useTick) */}
+      {/* Bridges layer */}
+      {connections.map((conn) => {
+        const start = entityPositions.get(conn.from);
+        const end = entityPositions.get(conn.to);
+
+        if (!start || !end) return null;
+
+        const midX = (start.x + end.x) / 2;
+        const midY = (start.y + end.y) / 2 + BRIDGE_OFFSET_Y;
+        const bridgeTexture = isTopLeftBridge(conn.from, conn.to)
+          ? textures.stairsTopLeft
+          : textures.stairsTopRight;
+
+        return (
+          <pixiSprite
+            key={`bridge-${conn.from}-${conn.to}`}
+            texture={bridgeTexture}
+            x={midX}
+            y={midY}
+            anchor={{ x: 0.5, y: 0.5 }}
+            scale={{ x: BRIDGE_SPRITE_SCALE, y: BRIDGE_SPRITE_SCALE }}
+          />
+        );
+      })}
+
+      {/* Entities layer (platforms + buildings, depth sorted) */}
+      {sortedEntities.map((entity) => {
+        const pos = gridToScreen(entity.position.x, entity.position.y, origin);
+        const buildingTexture = getBuildingTexture(entity);
+
+        return (
+          <pixiContainer
+            key={entity.id}
+            eventMode="static"
+            cursor="pointer"
+            onPointerDown={() => onEntityClick?.(entity)}
+            onPointerEnter={() => setHoveredId(entity.id)}
+            onPointerLeave={() =>
+              setHoveredId((prev) => (prev === entity.id ? null : prev))
+            }
+          >
+            <pixiSprite
+              texture={textures.island}
+              x={pos.x}
+              y={pos.y + PLATFORM_BASE_OFFSET_Y}
+              anchor={{ x: 0.5, y: 1 }}
+              scale={{ x: PLATFORM_SPRITE_SCALE, y: PLATFORM_SPRITE_SCALE }}
+            />
+            <pixiSprite
+              texture={buildingTexture}
+              x={pos.x}
+              y={pos.y + BUILDING_BASE_OFFSET_Y}
+              anchor={{ x: 0.5, y: 1 }}
+              scale={{
+                x: BUILDING_SPRITE_SCALE * (hoveredId === entity.id ? BUILDING_HOVER_SCALE : 1),
+                y: BUILDING_SPRITE_SCALE * (hoveredId === entity.id ? BUILDING_HOVER_SCALE : 1),
+              }}
+            />
+          </pixiContainer>
+        );
+      })}
+
+      {/* Animated effects layer (smoke, glow) */}
       <pixiGraphics
         ref={effectsRef}
         draw={() => {/* initial draw is no-op; useTick redraws imperatively */}}
       />
+
+      {/* Foreground clouds — over islands for depth */}
+      {fgClouds.map(({ cloud, index }) => (
+        <pixiContainer
+          key={`cloud-fg-${index}`}
+          ref={(node: PixiContainerClass | null) => { cloudContainerRefs.current[index] = node; }}
+        >
+          <pixiSprite
+            texture={cloud.direction === 'tr-bl' ? textures.cloud1 : textures.cloud2}
+            anchor={{ x: 0.5, y: 0.5 }}
+            scale={{ x: cloud.scale, y: cloud.scale }}
+            alpha={cloud.alpha}
+          />
+        </pixiContainer>
+      ))}
     </>
   );
 }
 
 export function PixiIsometricMap(props: PixiIsometricMapProps) {
+  const [textures, setTextures] = useState<GameSpriteTextures | null>(null);
+
+  // Load textures after the PixiJS Application (and its WebGL context) has initialized.
+  // Loading before this point creates textures without a GPU context, rendering them blank.
+  const handleAppInit = useCallback(() => {
+    loadGameSpriteTextures()
+      .then((loaded) => {
+        setTextures(loaded);
+      })
+      .catch((err) => {
+        console.error('Failed to load game sprites:', err);
+      });
+  }, []);
+
   return (
-    <PixiApplication width={props.width} height={props.height}>
-      <IsometricScene {...props} />
+    <PixiApplication
+      width={props.width}
+      height={props.height}
+      onInit={handleAppInit}
+    >
+      {textures && <IsometricScene {...props} textures={textures} />}
     </PixiApplication>
   );
 }

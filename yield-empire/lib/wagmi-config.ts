@@ -9,14 +9,18 @@ import { defineChain } from 'viem';
 
 // Arc Testnet chain definition
 // Reference: resources/arc-multichain-wallet/lib/circle/gateway-sdk.ts
-const arcRpcKey = process.env.NEXT_PUBLIC_ARC_TESTNET_RPC_KEY || 'c0ca2582063a5bbd5db2f98c139775e982b16919';
+// Public endpoint works without a key; add a key only if you have one to avoid rate limits.
+const arcRpcKey = process.env.NEXT_PUBLIC_ARC_TESTNET_RPC_KEY;
+const arcRpcUrl = arcRpcKey
+  ? `https://rpc.testnet.arc.network/${arcRpcKey}`
+  : 'https://rpc.testnet.arc.network';
 
 export const arcTestnet = defineChain({
   id: 5042002,
   name: 'Arc Testnet',
   nativeCurrency: { name: 'USD Coin', symbol: 'USDC', decimals: 6 },
   rpcUrls: {
-    default: { http: [`https://rpc.testnet.arc.network/${arcRpcKey}`] },
+    default: { http: [arcRpcUrl] },
   },
   blockExplorers: {
     default: { name: 'Explorer', url: 'https://explorer.arc.testnet.circle.com' },

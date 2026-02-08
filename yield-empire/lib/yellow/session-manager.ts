@@ -119,6 +119,15 @@ export class YellowSessionManager {
       this.isConnecting = false;
       this.emitState();
     } catch (error) {
+      // Clean up ping interval and WebSocket on failed connect/auth
+      if (this.pingInterval) {
+        clearInterval(this.pingInterval);
+        this.pingInterval = null;
+      }
+      if (this.ws) {
+        this.ws.close();
+        this.ws = null;
+      }
       this.isConnecting = false;
       this.emitState();
       throw error;
@@ -306,6 +315,10 @@ export class YellowSessionManager {
           clearInterval(this.pingInterval);
           this.pingInterval = null;
         }
+
+        // Clear all pending request handlers to prevent closure leaks
+        this.requestHandlers.clear();
+
         this.emitState();
       };
 

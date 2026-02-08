@@ -7,7 +7,7 @@
 
 :root {
   /* Background colors */
-  --bg-primary: #1a1a2e;
+  --bg-primary: #4d285c;
   --bg-secondary: #2d2d44;
   --panel-bg: #16162a;
   --border-color: #4a4a6a;
@@ -30,6 +30,14 @@
   /* Text colors */
   --foreground: #ededed;
   --foreground-muted: #a0a0a0;
+
+  /* Background gradient */
+  --bg-gradient: radial-gradient(
+    circle,
+    rgba(77, 40, 92, 1) 0%,
+    rgba(40, 19, 54, 1) 49%,
+    rgba(1, 0, 3, 1) 100%
+  );
 }
 
 @theme inline {
@@ -56,9 +64,14 @@ body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-primary);
+  background: var(--bg-gradient);
   color: var(--foreground);
   font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+/* Apply gradient to game background utility */
+.bg-game-bg {
+  background: var(--bg-gradient);
 }
 
 /* Ensure provider wrappers don't block scroll */
@@ -167,4 +180,9 @@ body > div {
 .select-none {
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* Keep Pixi canvas transparent */
+.pixi-canvas {
+  background: transparent;
 }
