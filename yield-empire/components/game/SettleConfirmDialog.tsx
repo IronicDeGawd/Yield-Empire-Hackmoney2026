@@ -28,9 +28,9 @@ function chainLabel(chainId: number): string {
 
 function rateSourceBadge(source?: RateSource) {
   if (!source) return null;
-  if (source === 'live') return <span className="text-[9px] text-green-400 ml-1">[LIVE]</span>;
-  if (source === 'estimated') return <span className="text-[9px] text-yellow-400 ml-1">[EST]</span>;
-  return <span className="text-[9px] text-gray-400 ml-1">[SIM]</span>;
+  if (source === 'live') return <span className="font-pixel text-[7px] text-neon-green ml-1">[LIVE]</span>;
+  if (source === 'estimated') return <span className="font-pixel text-[7px] text-gold ml-1">[EST]</span>;
+  return <span className="font-pixel text-[7px] text-muted-foreground ml-1">[SIM]</span>;
 }
 
 export function SettleConfirmDialog({
@@ -66,15 +66,15 @@ export function SettleConfirmDialog({
       />
 
       {/* Dialog */}
-      <div className="relative bg-[#16162a] border border-purple-700/50 rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+      <div className="relative retro-card retro-card-gold w-full max-w-md mx-4 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-purple-700/30">
-          <h2 className="text-lg font-bold text-yellow-400 uppercase tracking-wider">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="font-pixel text-[10px] text-gold uppercase tracking-wider">
             Settlement Summary
           </h2>
           <button
             onClick={onCancel}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <X size={20} />
           </button>
@@ -90,18 +90,18 @@ export function SettleConfirmDialog({
               return (
                 <div
                   key={entity.id}
-                  className="flex items-center justify-between bg-purple-900/30 rounded-lg px-3 py-2"
+                  className="flex items-center justify-between bg-secondary/50 rounded-sm px-3 py-2 border border-border"
                 >
                   <div>
-                    <div className="text-sm font-bold text-white">
+                    <div className="font-pixel text-[9px] text-foreground">
                       {config.name}
                       {rateSourceBadge(entity.rateSource)}
                     </div>
-                    <div className="text-xs text-gray-400">
+                    <div className="font-retro text-sm text-muted-foreground">
                       {chainLabel(chainId)}
                     </div>
                   </div>
-                  <div className="text-sm font-mono text-green-400">
+                  <div className="font-retro text-base text-neon-green">
                     ${entity.deposited.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </div>
                 </div>
@@ -110,27 +110,27 @@ export function SettleConfirmDialog({
           </div>
 
           {/* Totals */}
-          <div className="border-t border-purple-700/30 pt-3 space-y-1">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Total USDC</span>
-              <span className="text-white font-bold">
+          <div className="border-t border-border pt-3 space-y-1">
+            <div className="flex justify-between font-retro text-base">
+              <span className="text-muted-foreground">Total USDC</span>
+              <span className="text-foreground font-bold">
                 ${totalUsdc.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Actions settled</span>
-              <span className="text-white">{actionCount}</span>
+            <div className="flex justify-between font-retro text-base">
+              <span className="text-muted-foreground">Actions settled</span>
+              <span className="text-foreground">{actionCount}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Gas saved</span>
-              <span className="text-green-400">${gasSaved.toFixed(2)}</span>
+            <div className="flex justify-between font-retro text-base">
+              <span className="text-muted-foreground">Gas saved</span>
+              <span className="text-neon-green">${gasSaved.toFixed(2)}</span>
             </div>
           </div>
 
           {/* Warning */}
-          <div className="flex items-start gap-2 bg-yellow-900/20 border border-yellow-700/30 rounded-lg px-3 py-2">
-            <AlertTriangle size={16} className="text-yellow-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-yellow-200">
+          <div className="flex items-start gap-2 bg-gold/10 border border-gold/30 rounded-sm px-3 py-2">
+            <AlertTriangle size={16} className="text-gold shrink-0 mt-0.5" />
+            <p className="font-retro text-sm text-gold">
               You will be asked to approve ~<strong>{walletPopups}</strong> wallet signature{walletPopups !== 1 ? 's' : ''}
               {chainCount > 1 ? ` across ${chainCount} chains` : ''}.
               This includes token approvals and protocol transactions.
@@ -139,16 +139,16 @@ export function SettleConfirmDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 px-5 py-4 border-t border-purple-700/30">
+        <div className="flex gap-3 px-5 py-4 border-t border-border">
           <button
             onClick={onCancel}
-            className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-200 font-bold py-2 px-4 rounded-lg border-b-2 border-gray-800 uppercase text-sm tracking-wider transition-colors"
+            className="flex-1 bracket-btn font-pixel text-[9px] py-2 px-4 text-muted-foreground"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-2 px-4 rounded-lg border-b-2 border-yellow-700 uppercase text-sm tracking-wider transition-colors"
+            className="flex-1 arcade-btn arcade-btn-gold font-pixel text-[9px] py-2 px-4"
           >
             Confirm Settle
           </button>

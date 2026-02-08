@@ -29,11 +29,11 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 /** Maps each protocol to its settlement chain + USDC source */
 const PROTOCOL_CHAIN_INFO: Record<string, { chain: string; usdc: string; color: string }> = {
-  aave:     { chain: 'Base Sepolia', usdc: 'Aave USDC (via Treasury)', color: 'text-blue-400' },
-  compound: { chain: 'Sepolia',      usdc: 'Circle USDC',              color: 'text-green-400' },
-  uniswap:  { chain: 'Sepolia',      usdc: 'Circle USDC',              color: 'text-pink-400' },
-  curve:    { chain: 'Sepolia',      usdc: 'Circle USDC (Morpho)',     color: 'text-yellow-400' },
-  yearn:    { chain: 'Simulated',    usdc: 'N/A',                      color: 'text-gray-400' },
+  aave:     { chain: 'Base Sepolia', usdc: 'Aave USDC (via Treasury)', color: 'text-neon-blue' },
+  compound: { chain: 'Sepolia',      usdc: 'Circle USDC',              color: 'text-neon-green' },
+  uniswap:  { chain: 'Sepolia',      usdc: 'Circle USDC',              color: 'text-neon-pink' },
+  curve:    { chain: 'Sepolia',      usdc: 'Circle USDC (Morpho)',     color: 'text-gold' },
+  yearn:    { chain: 'Simulated',    usdc: 'N/A',                      color: 'text-muted-foreground' },
 };
 
 interface GameUIProps {
@@ -110,15 +110,15 @@ export function GameUI({
   };
 
   return (
-    <div className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-between font-mono">
+    <div className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-between">
       {/* Top Bar */}
       <header className="flex items-start justify-between w-full pointer-events-auto">
         {/* User Info - Top Left */}
-        <div className="bg-game-panel border-2 border-game-border rounded-xl p-2 px-4 flex items-center gap-4 text-white shadow-lg shadow-purple-900/50">
+        <div className="retro-card retro-card-purple p-2 px-4 flex items-center gap-4 text-foreground">
           {player ? (
             <>
               <Link href={`/profile/${player.ensName || player.address}`} className="shrink-0">
-                <div className="w-10 h-10 bg-yellow-600 rounded-md border-2 border-white overflow-hidden hover:border-yellow-400 transition-colors">
+                <div className="w-10 h-10 bg-gold/30 rounded-sm border-2 border-gold overflow-hidden hover:border-neon-green transition-colors">
                   {player.avatar ? (
                     <img
                       src={player.avatar}
@@ -129,7 +129,7 @@ export function GameUI({
                       style={{ imageRendering: 'pixelated' }}
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500" />
+                    <div className="w-full h-full bg-gradient-to-br from-primary to-neon-pink" />
                   )}
                 </div>
               </Link>
@@ -137,21 +137,21 @@ export function GameUI({
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/profile/${player.ensName || player.address}`}
-                    className="font-bold text-lg tracking-wide hover:text-yellow-400 transition-colors"
+                    className="font-pixel text-[10px] text-foreground hover:text-gold transition-colors"
                   >
                     {player.ensName || `${player.address.slice(0, 6)}\u2026${player.address.slice(-4)}`}
                   </Link>
-                  <span className="text-xs bg-purple-600 px-1 rounded text-purple-200">
+                  <span className="font-pixel text-[8px] bg-primary/30 px-1.5 py-0.5 rounded-sm text-primary">
                     Lv.{player.empireLevel}
                   </span>
                 </div>
-                <div className="flex items-center text-yellow-400 text-sm gap-1">
+                <div className="flex items-center text-gold font-retro text-base gap-1">
                   <Zap size={14} fill="currentColor" />
                   <span>{session?.actionCount || 0} actions</span>
                   {isConnecting && (
-                    <span className="flex items-center gap-1 text-purple-300 ml-2">
+                    <span className="flex items-center gap-1 text-primary ml-2">
                       <Loader2 size={12} className="animate-spin" />
-                      connecting{'\u2026'}
+                      <span className="font-retro text-sm">connecting{'\u2026'}</span>
                     </span>
                   )}
                 </div>
@@ -168,21 +168,21 @@ export function GameUI({
           <nav className="flex items-center gap-1">
             <Link
               href="/guild"
-              className="p-2 rounded-lg bg-game-panel border border-game-border text-purple-300 hover:text-white hover:bg-purple-800 transition-colors"
+              className="p-2 rounded-sm retro-card text-muted-foreground hover:text-gold transition-colors"
               title="Guild"
             >
               <Users size={18} />
             </Link>
             <Link
               href="/leaderboard"
-              className="p-2 rounded-lg bg-game-panel border border-game-border text-purple-300 hover:text-white hover:bg-purple-800 transition-colors"
+              className="p-2 rounded-sm retro-card text-muted-foreground hover:text-gold transition-colors"
               title="Leaderboard"
             >
               <Trophy size={18} />
             </Link>
             <Link
               href="/settlement"
-              className="p-2 rounded-lg bg-game-panel border border-game-border text-purple-300 hover:text-white hover:bg-purple-800 transition-colors"
+              className="p-2 rounded-sm retro-card text-muted-foreground hover:text-gold transition-colors"
               title="Settlement"
             >
               <BarChart3 size={18} />
@@ -190,7 +190,7 @@ export function GameUI({
             {player && (
               <Link
                 href={`/profile/${player.ensName || player.address}`}
-                className="p-2 rounded-lg bg-game-panel border border-game-border text-purple-300 hover:text-white hover:bg-purple-800 transition-colors"
+                className="p-2 rounded-sm retro-card text-muted-foreground hover:text-gold transition-colors"
                 title="Profile"
               >
                 <User size={18} />
@@ -203,7 +203,7 @@ export function GameUI({
             <button
               onClick={onSettle}
               disabled={isSettling || totalTVL === 0}
-              className="bg-yellow-500 hover:bg-yellow-400 disabled:bg-yellow-700 disabled:cursor-not-allowed text-black font-bold py-2 px-6 rounded-lg border-b-4 border-yellow-700 active:border-b-0 active:translate-y-1 transition-all shadow-lg uppercase tracking-wider flex items-center gap-2"
+              className="arcade-btn arcade-btn-gold font-pixel text-[10px] py-2 px-6 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSettling ? (
                 <>
@@ -222,12 +222,12 @@ export function GameUI({
 
       {/* Connection Error Banner */}
       {connectionError && (
-        <div className="pointer-events-auto mt-2 mx-auto max-w-lg bg-red-900/80 border border-red-500 rounded-lg px-4 py-3 flex items-center justify-between gap-3 text-sm">
-          <span className="text-red-200">{connectionError}</span>
+        <div className="pointer-events-auto mt-2 mx-auto max-w-lg retro-card border-destructive/50 px-4 py-3 flex items-center justify-between gap-3">
+          <span className="font-retro text-base text-destructive">{connectionError}</span>
           {onRetryConnect && (
             <button
               onClick={onRetryConnect}
-              className="shrink-0 bg-red-700 hover:bg-red-600 text-white text-xs font-bold px-3 py-1 rounded uppercase"
+              className="shrink-0 bracket-btn bracket-btn-gold font-pixel text-[8px]"
             >
               Retry
             </button>
@@ -239,35 +239,35 @@ export function GameUI({
       <div className="flex-1 flex flex-col w-full mt-4">
         {/* Right Top Info Panel */}
         <div className="self-end pointer-events-auto">
-          <div className="bg-game-panel border-2 border-game-border rounded-xl p-4 text-white w-72 shadow-2xl">
-            <div className="space-y-1 mb-4 text-sm font-mono">
-              <div className="flex justify-between text-gray-300">
+          <div className="retro-card retro-card-purple p-4 text-foreground w-72">
+            <div className="space-y-1 mb-4">
+              <div className="flex justify-between font-retro text-base text-muted-foreground">
                 <span>TVL:</span>
-                <span className="text-white font-bold">${totalTVL.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                <span className="text-foreground font-bold">${totalTVL.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between text-gray-300">
+              <div className="flex justify-between font-retro text-base text-muted-foreground">
                 <span>$EMPIRE/day:</span>
-                <span className="text-green-400 font-bold">{dailyEmpire.toFixed(4)}</span>
+                <span className="text-neon-green font-bold">{dailyEmpire.toFixed(4)}</span>
               </div>
               {empireTokens > 0 && (
-                <div className="flex justify-between text-gray-300">
+                <div className="flex justify-between font-retro text-base text-muted-foreground">
                   <span>$EMPIRE:</span>
-                  <span className="text-yellow-300 font-bold">{empireTokens.toFixed(4)}</span>
+                  <span className="text-gold font-bold">{empireTokens.toFixed(4)}</span>
                 </div>
               )}
               {guild && (
-                <div className="flex justify-between text-gray-300 items-center">
+                <div className="flex justify-between font-retro text-base text-muted-foreground items-center">
                   <span>Guild:</span>
-                  <span className="text-white flex items-center gap-1">
+                  <span className="text-foreground flex items-center gap-1">
                     {guild.name}
-                    <Lock size={12} className="text-yellow-500" />
+                    <Lock size={12} className="text-gold" />
                   </span>
                 </div>
               )}
               {session?.isSessionActive && (
-                <div className="flex justify-between text-gray-300">
+                <div className="flex justify-between font-retro text-base text-muted-foreground">
                   <span>Gas saved:</span>
-                  <span className="text-green-400 font-bold">
+                  <span className="text-neon-green font-bold">
                     ~${session.gasSaved.toFixed(2)}
                   </span>
                 </div>
@@ -278,10 +278,10 @@ export function GameUI({
             <button
               onClick={onCompoundAll}
               disabled={empireTokens <= 0 || !session?.isSessionActive}
-              className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 disabled:from-yellow-800 disabled:to-yellow-900 disabled:text-gray-500 disabled:cursor-not-allowed text-black font-bold py-3 px-4 rounded-lg border-b-4 border-yellow-800 active:border-b-0 active:translate-y-1 transition-all shadow-lg flex items-center justify-between uppercase"
+              className="w-full arcade-btn arcade-btn-gold font-pixel text-[10px] py-3 px-4 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-between uppercase"
             >
               <span>[ Compound All ]</span>
-              <div className="w-3 h-3 bg-white rotate-45 transform" />
+              <div className="w-3 h-3 bg-foreground rotate-45 transform" />
             </button>
 
             {/* Guild Contribute */}
@@ -296,11 +296,11 @@ export function GameUI({
                   value={guildAmount}
                   onChange={(e) => setGuildAmount(e.target.value)}
                   aria-label="Amount to contribute to guild"
-                  className="flex-1 bg-purple-900/50 border border-purple-600 rounded px-2 py-2 text-xs text-white placeholder-purple-400 outline-none focus:border-yellow-500 w-0"
+                  className="flex-1 bg-secondary border border-border rounded-sm px-2 py-2 font-retro text-sm text-foreground placeholder-muted-foreground outline-none focus:border-gold w-0"
                 />
                 <button
                   onClick={handleGuildContribute}
-                  className="bg-pink-600 hover:bg-pink-500 text-xs font-bold py-2 px-3 rounded border-b-2 border-pink-800 text-white uppercase shrink-0"
+                  className="bracket-btn bracket-btn-blue font-pixel text-[8px] py-2 px-3 shrink-0"
                 >
                   Guild
                 </button>
@@ -311,7 +311,7 @@ export function GameUI({
             {player && (
               <button
                 onClick={onDeposit}
-                className="w-full mt-2 bg-purple-700 hover:bg-purple-600 text-white font-bold py-2.5 px-4 rounded-lg border border-purple-500 transition-all flex items-center justify-center gap-2 uppercase text-sm"
+                className="w-full mt-2 bracket-btn bracket-btn-blue font-pixel text-[8px] py-2.5 px-4 flex items-center justify-center gap-2"
               >
                 <ArrowDownUp size={14} />
                 <span>Deposit from Any Chain</span>
@@ -329,10 +329,10 @@ export function GameUI({
             {entities.map((entity) => (
               <div
                 key={entity.id}
-                className="bg-game-panel border-2 border-game-border rounded-xl p-3 text-white relative hover:bg-purple-900/50 transition-colors group"
+                className="retro-card retro-card-purple p-3 text-foreground relative hover:bg-primary/10 transition-colors group"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-6 h-6 rounded border border-white/30 bg-purple-900/30 flex items-center justify-center overflow-hidden">
+                  <div className="w-6 h-6 rounded-sm border border-border bg-secondary/30 flex items-center justify-center overflow-hidden">
                     <img
                       src={getEntityIconSrc(entity)}
                       alt={`${entity.name} icon`}
@@ -343,20 +343,20 @@ export function GameUI({
                     />
                   </div>
                   <div className="flex items-baseline gap-1.5">
-                    <span className="font-bold uppercase text-sm leading-none">{entity.name}</span>
-                    <span className="text-xs text-purple-300">Lv{entity.level}</span>
+                    <span className="font-pixel text-[9px] uppercase leading-none text-foreground">{entity.name}</span>
+                    <span className="font-pixel text-[8px] text-primary">Lv{entity.level}</span>
                   </div>
                 </div>
-                <div className="text-xs text-gray-300 mb-0.5">
+                <div className="font-retro text-sm text-muted-foreground mb-0.5">
                   {entity.yieldRate.toFixed(1)}% APY
-                  {entity.rateSource === 'live' && <span className="text-[10px] text-green-400 ml-1">[LIVE]</span>}
-                  {entity.rateSource === 'estimated' && <span className="text-[10px] text-yellow-400 ml-1">[EST]</span>}
-                  {entity.rateSource === 'simulated' && <span className="text-[10px] text-gray-400 ml-1">[SIM]</span>}
+                  {entity.rateSource === 'live' && <span className="text-[10px] text-neon-green ml-1">[LIVE]</span>}
+                  {entity.rateSource === 'estimated' && <span className="text-[10px] text-gold ml-1">[EST]</span>}
+                  {entity.rateSource === 'simulated' && <span className="text-[10px] text-muted-foreground ml-1">[SIM]</span>}
                   {' '}&middot; ${entity.deposited.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </div>
                 {/* Settlement chain & USDC type badge */}
                 {PROTOCOL_CHAIN_INFO[entity.protocol] && (
-                  <div className="text-[10px] text-purple-400 mb-2 flex items-center gap-1">
+                  <div className="font-retro text-xs text-muted-foreground mb-2 flex items-center gap-1">
                     <span className={`font-bold ${PROTOCOL_CHAIN_INFO[entity.protocol].color}`}>
                       {PROTOCOL_CHAIN_INFO[entity.protocol].chain}
                     </span>
@@ -378,11 +378,11 @@ export function GameUI({
                         setDepositAmounts((prev) => ({ ...prev, [entity.id]: e.target.value }))
                       }
                       aria-label={`Deposit USDC to ${entity.name}`}
-                      className="flex-1 bg-purple-900/50 border border-purple-600 rounded px-2 py-1.5 text-xs text-white placeholder-purple-400 outline-none focus:border-yellow-500 w-0"
+                      className="flex-1 bg-secondary border border-border rounded-sm px-2 py-1.5 font-retro text-sm text-foreground placeholder-muted-foreground outline-none focus:border-gold w-0"
                     />
                     <button
                       onClick={() => handleBuildingDeposit(entity.id)}
-                      className="bg-green-600 hover:bg-green-500 text-xs font-bold py-1.5 px-2 rounded border-b-2 border-green-800 text-white uppercase shrink-0"
+                      className="bracket-btn bracket-btn-green font-pixel text-[10px] py-1.5 px-2 shrink-0"
                       title="Deposit USDC into this protocol"
                     >
                       +
@@ -393,7 +393,7 @@ export function GameUI({
                 <button
                   onClick={() => onUpgrade?.(entity.id)}
                   disabled={!session?.isSessionActive || empireTokens < getUpgradeCost(entity.level)}
-                  className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-yellow-900 disabled:text-gray-500 disabled:cursor-not-allowed text-xs font-bold py-1.5 px-2 rounded border-b-2 border-yellow-800 disabled:border-yellow-900 text-black uppercase"
+                  className="w-full arcade-btn arcade-btn-gold font-pixel text-[8px] py-1.5 px-2 disabled:opacity-40 disabled:cursor-not-allowed uppercase"
                   title={
                     !session?.isSessionActive
                       ? 'Waiting for Yellow session\u2026'
@@ -415,10 +415,10 @@ export function GameUI({
       {/* Settling Overlay */}
       {isSettling && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center pointer-events-auto">
-          <div className="bg-game-panel border-2 border-yellow-500 rounded-xl p-8 text-center text-white max-w-sm">
-            <Loader2 size={48} className="animate-spin mx-auto mb-4 text-yellow-400" />
-            <h2 className="text-xl font-bold mb-2">Settling On-Chain</h2>
-            <p className="text-gray-400 text-sm">
+          <div className="retro-card retro-card-gold p-8 text-center text-foreground max-w-sm">
+            <Loader2 size={48} className="animate-spin mx-auto mb-4 text-gold" />
+            <h2 className="font-pixel text-sm mb-2">Settling On-Chain</h2>
+            <p className="font-retro text-base text-muted-foreground">
               Executing protocol transactions across chains. This may take a moment...
             </p>
           </div>
