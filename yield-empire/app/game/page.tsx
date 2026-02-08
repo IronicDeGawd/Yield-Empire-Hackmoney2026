@@ -29,7 +29,9 @@ import { STAR_DATA } from '@/components/game/pixi/effects/Starfield';
 import { useYellowSession } from '@/hooks/useYellowSession';
 import { useProtocolRates } from '@/hooks/useProtocolRates';
 import { DepositPanel } from '@/components/game/DepositPanel';
+import { WelcomeModal } from '@/components/game/WelcomeModal';
 import { proxyAvatarUrl } from '@/lib/ens/guild-manager';
+import { saveGameState, loadGameState, clearGameState } from '@/lib/game-storage';
 
 /** Calculate empire level from total deposited and action count */
 function calcEmpireLevel(totalDeposited: number, actionCount: number): number {
@@ -55,6 +57,10 @@ export default function GamePage() {
   const [totalYieldEarned, setTotalYieldEarned] = useState(0);
   const [guildContributed, setGuildContributed] = useState(0);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Debounced save ref for yield accrual timer
+  const lastSaveRef = useRef(0);
 
   // Retry limit for Yellow Network auto-connect (max 4 attempts)
   const MAX_CONNECT_ATTEMPTS = 4;
@@ -71,6 +77,29 @@ export default function GamePage() {
   }, [isConnected, router]);
   const { data: ensName } = useEnsName({ address });
   const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
+
+  // ── Restore game state from localStorage on mount ───────────────────
+  useEffect(() => {
+    if (!address) return;
+    const saved = loadGameState(address);
+    if (saved) {
+      setEntities(saved.entities);
+      setAccruedYield(saved.accruedYield);
+      setTotalYieldEarned(saved.totalYieldEarned);
+      setGuildContributed(saved.guildContributed ?? 0);
+    }
+  }, [address]);
+
+  // ── Show welcome tutorial on first visit ────────────────────────────
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('yield-empire:skip-tutorial')) {
+        setShowWelcome(true);
+      }
+    } catch {
+      // SSR or private browsing
+    }
+  }, []);
 
   // Yellow Network session
   const yellowSession = useYellowSession();
@@ -149,11 +178,33 @@ export default function GamePage() {
       if (tickYield > 0) {
         setAccruedYield((prev) => prev + tickYield);
         setTotalYieldEarned((prev) => prev + tickYield);
+
+        // Debounced save: persist to localStorage every 10 seconds
+        const now = Date.now();
+        if (address && now - lastSaveRef.current > 10_000) {
+          lastSaveRef.current = now;
+          // Read latest state from refs to avoid stale closures
+          setAccruedYield((ay) => {
+            setTotalYieldEarned((ty) => {
+              setGuildContributed((gc) => {
+                saveGameState(address, {
+                  entities: entitiesRef.current,
+                  accruedYield: ay + tickYield,
+                  totalYieldEarned: ty + tickYield,
+                  guildContributed: gc,
+                });
+                return gc;
+              });
+              return ty;
+            });
+            return ay;
+          });
+        }
       }
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [ysSessionActive]);
+  }, [ysSessionActive, address]);
 
   // ── Auto-connect to Yellow Network (max 4 attempts) ────────────────
 
@@ -182,6 +233,17 @@ export default function GamePage() {
     }
   }, [ysConnected, ysSessionActive, ysConnecting, ysCreateSession]);
 
+  // ── Persist helper ──────────────────────────────────────────────────
+  const persistState = useCallback(() => {
+    if (!address) return;
+    saveGameState(address, {
+      entities: entitiesRef.current,
+      accruedYield,
+      totalYieldEarned,
+      guildContributed,
+    });
+  }, [address, accruedYield, totalYieldEarned, guildContributed]);
+
   // ── Game actions ─────────────────────────────────────────────────────
 
   // Deposit USDC to a building (allocate to protocol)
@@ -201,13 +263,14 @@ export default function GamePage() {
         { type: 'DEPOSIT_TO_PROTOCOL', protocol: entity.protocol, amount },
         { entities: entitiesRef.current, timestamp: Date.now() }
       );
+      persistState();
     } catch (err) {
       console.error('Failed to submit deposit action:', err);
       setEntities((prev) =>
         prev.map((e) => (e.id === entityId ? { ...e, deposited: e.deposited - amount } : e))
       );
     }
-  }, [yellowSession]);
+  }, [yellowSession, persistState]);
 
   // Upgrade building (costs accrued yield)
   const handleUpgrade = useCallback(async (entityId: string) => {
@@ -228,6 +291,7 @@ export default function GamePage() {
         { type: 'UPGRADE_BUILDING', buildingId: entityId },
         { entities, timestamp: Date.now() }
       );
+      persistState();
     } catch (err) {
       console.error('Failed to submit upgrade action:', err);
       // Revert both level and yield cost
@@ -236,7 +300,7 @@ export default function GamePage() {
         prev.map((e) => (e.id === entityId ? { ...e, level: e.level - 1 } : e))
       );
     }
-  }, [yellowSession, entities, accruedYield]);
+  }, [yellowSession, entities, accruedYield, persistState]);
 
   // Compound all — reinvest accrued yield across buildings proportionally
   const handleCompoundAll = useCallback(async () => {
@@ -261,6 +325,7 @@ export default function GamePage() {
         { type: 'COMPOUND_YIELD' },
         { entities, accruedYield: yieldToCompound, timestamp: Date.now() }
       );
+      persistState();
     } catch (err) {
       console.error('Failed to submit compound action:', err);
       // Revert: remove compounded yield from buildings
@@ -274,7 +339,7 @@ export default function GamePage() {
       }
       setAccruedYield(yieldToCompound);
     }
-  }, [yellowSession, entities, accruedYield]);
+  }, [yellowSession, entities, accruedYield, persistState]);
 
   // Contribute to guild
   const handleGuildContribute = useCallback(async (amount: number) => {
@@ -288,12 +353,13 @@ export default function GamePage() {
         { type: 'CONTRIBUTE_TO_GUILD', amount },
         { entities, guildContributed: guildContributed + amount, timestamp: Date.now() }
       );
+      persistState();
     } catch (err) {
       console.error('Failed to submit guild contribution:', err);
       setAccruedYield((prev) => prev + amount);
       setGuildContributed((prev) => prev - amount);
     }
-  }, [yellowSession, entities, accruedYield, guildContributed]);
+  }, [yellowSession, entities, accruedYield, guildContributed, persistState]);
 
   // Settlement — passes entities for real protocol execution
   const [isSettleConfirmOpen, setIsSettleConfirmOpen] = useState(false);
@@ -306,12 +372,22 @@ export default function GamePage() {
   const handleSettleConfirmed = useCallback(async () => {
     setIsSettleConfirmOpen(false);
     try {
-      await yellowSession.settleSession(entities);
+      await yellowSession.settleSession(entities, {
+        empireLevel,
+        totalYieldEarned,
+        ensName: ensName ?? undefined,
+      });
+      // Clear persisted state and reset game after successful settlement
+      if (address) clearGameState(address);
+      setEntities(INITIAL_ENTITIES);
+      setAccruedYield(0);
+      setTotalYieldEarned(0);
+      setGuildContributed(0);
     } catch (err) {
       console.error('Settlement failed:', err);
       alert('Settlement failed. Please try again.');
     }
-  }, [yellowSession, entities]);
+  }, [yellowSession, entities, empireLevel, totalYieldEarned, ensName, address]);
 
   // Handle entity click
   const handleEntityClick = (entity: GameEntity) => {
@@ -404,6 +480,20 @@ export default function GamePage() {
         gasSaved={yellowSession.gasSaved}
         onConfirm={handleSettleConfirmed}
         onCancel={() => setIsSettleConfirmOpen(false)}
+      />
+
+      {/* Welcome Tutorial Modal */}
+      <WelcomeModal
+        isOpen={showWelcome}
+        onClose={() => setShowWelcome(false)}
+        onDontShowAgain={() => {
+          setShowWelcome(false);
+          try {
+            localStorage.setItem('yield-empire:skip-tutorial', '1');
+          } catch {
+            // Silently ignore
+          }
+        }}
       />
     </div>
   );

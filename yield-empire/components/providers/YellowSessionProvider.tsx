@@ -32,6 +32,7 @@ import { swapOnUniswap } from '@/lib/protocols/uniswap';
 import { supplyToMorpho } from '@/lib/protocols/morpho';
 import { BUILDING_CONFIGS } from '@/lib/constants';
 import { PROTOCOL_CHAIN_MAP, SETTLEMENT_CHAINS } from '@/lib/protocols/addresses';
+import { updatePlayerProfile } from '@/lib/ens/guild-manager';
 
 export interface YellowSessionContextValue {
   // Connection state
@@ -53,7 +54,7 @@ export interface YellowSessionContextValue {
   // Actions
   connect: () => Promise<void>;
   createSession: () => Promise<void>;
-  settleSession: (entities: GameEntity[]) => Promise<void>;
+  settleSession: (entities: GameEntity[], meta?: { empireLevel: number; totalYieldEarned: number; ensName?: string }) => Promise<void>;
   performAction: (action: GameAction, gameState: object) => Promise<void>;
   disconnect: () => void;
 }
@@ -200,7 +201,7 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
    * Settle session: close Yellow Network state channel, then execute
    * real on-chain protocol transactions for each building allocation.
    */
-  const settleSession = useCallback(async (entities: GameEntity[]) => {
+  const settleSession = useCallback(async (entities: GameEntity[], meta?: { empireLevel: number; totalYieldEarned: number; ensName?: string }) => {
     if (!managerRef.current || !address || !walletClient) {
       setError('Cannot settle session');
       return;
@@ -271,6 +272,26 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
             status: 'failed',
             error: txErr instanceof Error ? txErr.message : 'Transaction failed',
           });
+        }
+      }
+
+      // Step 3: Update ENS text records (optional, non-blocking)
+      if (meta?.ensName && walletClient) {
+        try {
+          const totalDeposited = entities.reduce((s, e) => s + e.deposited, 0);
+          // Find the protocol with the highest deposit
+          const sorted = [...entities].sort((a, b) => b.deposited - a.deposited);
+          const favoriteProtocol = sorted[0]?.deposited > 0 ? sorted[0].protocol : undefined;
+
+          await updatePlayerProfile(walletClient, meta.ensName, {
+            empireLevel: meta.empireLevel,
+            totalContribution: totalDeposited,
+            favoriteProtocol,
+            prestigeCount: 0,
+          });
+        } catch (ensErr) {
+          // ENS write failures should NOT fail the settlement
+          console.warn('Failed to update ENS profile:', ensErr);
         }
       }
 

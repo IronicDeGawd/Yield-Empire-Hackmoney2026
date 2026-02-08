@@ -218,6 +218,39 @@ export async function updateGuildStats(
   return hashes;
 }
 
+/**
+ * Update player profile text records on ENS after settlement.
+ * Each field is a separate on-chain transaction (setText).
+ * Skips fields with zero/empty values to minimize gas.
+ */
+export async function updatePlayerProfile(
+  walletClient: AnyWalletClient,
+  playerName: string,
+  stats: {
+    empireLevel: number;
+    totalContribution: number;
+    favoriteProtocol?: string;
+    prestigeCount: number;
+  },
+): Promise<Hash[]> {
+  const records: Partial<Record<string, string>> = {};
+
+  if (stats.empireLevel > 0) {
+    records[GAME_KEYS.EMPIRE_LEVEL] = String(stats.empireLevel);
+  }
+  if (stats.totalContribution > 0) {
+    records[GAME_KEYS.TOTAL_CONTRIBUTION] = String(Math.round(stats.totalContribution));
+  }
+  if (stats.favoriteProtocol) {
+    records[GAME_KEYS.FAVORITE_PROTOCOL] = stats.favoriteProtocol;
+  }
+  if (stats.prestigeCount > 0) {
+    records[GAME_KEYS.PRESTIGE_COUNT] = String(stats.prestigeCount);
+  }
+
+  return updateGuildStats(walletClient, playerName, records);
+}
+
 // ============================================================================
 // SUBDOMAIN CREATION
 // ============================================================================

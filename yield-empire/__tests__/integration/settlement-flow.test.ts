@@ -32,6 +32,11 @@ jest.mock('@/lib/protocols/morpho', () => ({
   supplyToMorpho: (...args: unknown[]) => mockSupplyToMorpho(...args),
 }));
 
+const mockUpdatePlayerProfile = jest.fn().mockResolvedValue([]);
+jest.mock('@/lib/ens/guild-manager', () => ({
+  updatePlayerProfile: (...args: unknown[]) => mockUpdatePlayerProfile(...args),
+}));
+
 // Mock YellowSessionManager
 const mockManagerSettleSession = jest.fn().mockResolvedValue(undefined);
 const mockManagerDisconnect = jest.fn();
