@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Graphics } from 'pixi.js';
+import { Container as PixiContainerClass, Graphics } from 'pixi.js';
 import { useTick } from '@pixi/react';
 import { PixiApplication } from './pixi/PixiApplication';
 import { GameEntity, Connection } from '@/lib/types';
@@ -22,7 +22,7 @@ import {
 import { drawSmokeParticles } from './pixi/effects/SmokeParticles';
 import { drawCrystalGlow } from './pixi/effects/GlowEffect';
 import { type GameSpriteTextures, loadGameSpriteTextures } from './pixi/assets';
-import { CLOUD_DATA } from './pixi/effects/Starfield';
+import { CLOUD_DATA, type CloudData } from './pixi/effects/Starfield';
 
 interface PixiIsometricMapProps {
   entities: GameEntity[];
@@ -121,32 +121,96 @@ function IsometricScene({
   const BRIDGE_OFFSET_Y = -8;
   const PLATFORM_BASE_OFFSET_Y = TILE_HEIGHT / 2 + BLOCK_HEIGHT;
   const BUILDING_BASE_OFFSET_Y = -20;
-  const CLOUD_BASE_WIDTH = 64;
-  const CLOUD_BASE_HEIGHT = 40;
+
+  // Cloud animation — imperatively updated each frame via container refs
+  const cloudContainerRefs = useRef<(PixiContainerClass | null)[]>(
+    new Array(CLOUD_DATA.length).fill(null)
+  );
+  const cloudOffsets = useRef(CLOUD_DATA.map((c) => c.startOffset));
+
+  // Compute cloud pixel position from normalized offset
+  const getCloudPos = useCallback(
+    (cloud: CloudData, offset: number) => {
+      const margin = 200;
+      if (cloud.direction === 'tr-bl') {
+        return {
+          x: (width + margin) * (1 - offset) - margin / 2,
+          y: (height + margin) * offset - margin / 2,
+        };
+      }
+      return {
+        x: (width + margin) * offset - margin / 2,
+        y: (height + margin) * offset - margin / 2,
+      };
+    },
+    [width, height]
+  );
+
+  useTick((ticker) => {
+    timeRef.current += ticker.deltaTime / 60;
+    const dt = ticker.deltaTime / 60;
+
+    // Advance cloud offsets and update container positions
+    const diagonal = Math.sqrt(width * width + height * height);
+    CLOUD_DATA.forEach((cloud, i) => {
+      const normalizedSpeed = cloud.speed / diagonal;
+      cloudOffsets.current[i] += normalizedSpeed * dt;
+      if (cloudOffsets.current[i] > 1.15) {
+        cloudOffsets.current[i] = -0.15;
+      }
+      const container = cloudContainerRefs.current[i];
+      if (container) {
+        const pos = getCloudPos(cloud, cloudOffsets.current[i]);
+        container.x = pos.x;
+        container.y = pos.y;
+      }
+    });
+
+    // Redraw effects (smoke, glow)
+    const g = effectsRef.current;
+    if (!g) return;
+    g.clear();
+
+    sortedEntities.forEach((entity) => {
+      const pos = gridToScreen(entity.position.x, entity.position.y, origin);
+      if (entity.type === 'factory') {
+        drawSmokeParticles(g, pos.x, pos.y + 18, timeRef.current);
+      }
+      if (entity.type === 'crystal') {
+        drawCrystalGlow(g, pos.x, pos.y, entity.color, timeRef.current);
+      }
+    });
+  });
+
+  const bgClouds = useMemo(() => {
+    const result: { cloud: CloudData; index: number }[] = [];
+    CLOUD_DATA.forEach((c, i) => { if (c.layer === 'bg') result.push({ cloud: c, index: i }); });
+    return result;
+  }, []);
+  const fgClouds = useMemo(() => {
+    const result: { cloud: CloudData; index: number }[] = [];
+    CLOUD_DATA.forEach((c, i) => { if (c.layer === 'fg') result.push({ cloud: c, index: i }); });
+    return result;
+  }, []);
 
   return (
     <>
-      {/* Cloud layer (behind bridges and islands) */}
-      {CLOUD_DATA.map((cloud, i) => {
-        const texture =
-          i % 3 === 0 ? textures.cloud1 : i % 3 === 1 ? textures.cloud2 : textures.cloud3;
-        const scaleX = cloud.width / CLOUD_BASE_WIDTH;
-        const scaleY = cloud.height / CLOUD_BASE_HEIGHT;
-
-        return (
+      {/* Background clouds — behind islands */}
+      {bgClouds.map(({ cloud, index }) => (
+        <pixiContainer
+          key={`cloud-bg-${index}`}
+          ref={(node: PixiContainerClass | null) => { cloudContainerRefs.current[index] = node; }}
+        >
           <pixiSprite
-            key={`cloud-${i}`}
-            texture={texture}
-            x={cloud.x * width}
-            y={cloud.y * height}
+            texture={cloud.direction === 'tr-bl' ? textures.cloud1 : textures.cloud2}
             anchor={{ x: 0.5, y: 0.5 }}
-            scale={{ x: scaleX, y: scaleY }}
-            alpha={0.35}
+            scale={{ x: cloud.scale, y: cloud.scale }}
+            alpha={cloud.alpha}
           />
-        );
-      })}
+        </pixiContainer>
+      ))}
 
-      {/* Bridges layer (rendered first, behind everything) */}
+      {/* Bridges layer */}
       {connections.map((conn) => {
         const start = entityPositions.get(conn.from);
         const end = entityPositions.get(conn.to);
@@ -208,11 +272,26 @@ function IsometricScene({
         );
       })}
 
-      {/* Animated effects layer (smoke, glow — redrawn each frame by useTick) */}
+      {/* Animated effects layer (smoke, glow) */}
       <pixiGraphics
         ref={effectsRef}
         draw={() => {/* initial draw is no-op; useTick redraws imperatively */}}
       />
+
+      {/* Foreground clouds — over islands for depth */}
+      {fgClouds.map(({ cloud, index }) => (
+        <pixiContainer
+          key={`cloud-fg-${index}`}
+          ref={(node: PixiContainerClass | null) => { cloudContainerRefs.current[index] = node; }}
+        >
+          <pixiSprite
+            texture={cloud.direction === 'tr-bl' ? textures.cloud1 : textures.cloud2}
+            anchor={{ x: 0.5, y: 0.5 }}
+            scale={{ x: cloud.scale, y: cloud.scale }}
+            alpha={cloud.alpha}
+          />
+        </pixiContainer>
+      ))}
     </>
   );
 }

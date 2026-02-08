@@ -14,8 +14,7 @@ export type GameSpriteKey =
   | 'stairsTopLeft'
   | 'stairsTopRight'
   | 'cloud1'
-  | 'cloud2'
-  | 'cloud3';
+  | 'cloud2';
 
 export type GameSpriteTextures = Record<GameSpriteKey, Texture>;
 
@@ -29,7 +28,6 @@ const SPRITE_URLS: Record<GameSpriteKey, string> = {
   stairsTopRight: '/assets/sprites/stairs-topright.png',
   cloud1: '/assets/sprites/cloud1.png',
   cloud2: '/assets/sprites/cloud2.png',
-  cloud3: '/assets/sprites/cloud3.png',
 };
 
 export async function loadGameSpriteTextures(): Promise<GameSpriteTextures> {
