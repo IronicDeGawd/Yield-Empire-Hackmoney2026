@@ -5,8 +5,8 @@
  *
  * Phase 5: Full game loop
  *   - Per-building deposit input (allocate USDC to protocol)
- *   - Accrued yield display with compound button
- *   - Guild contribution from accrued yield
+ *   - $EMPIRE token balance display with compound button
+ *   - Guild contribution from $EMPIRE balance
  *   - Connecting/settling loading indicators
  *   - Navigation to guild, leaderboard, settlement, profile
  */
@@ -14,9 +14,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import {
-  Settings,
   Zap,
-  Plus,
   Lock,
   ArrowDownUp,
   Loader2,
@@ -26,14 +24,24 @@ import {
   User,
 } from 'lucide-react';
 import { GameEntity, PlayerProfile, GuildProfile, SessionState } from '@/lib/types';
+import { getUpgradeCost } from '@/lib/constants';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+
+/** Maps each protocol to its settlement chain + USDC source */
+const PROTOCOL_CHAIN_INFO: Record<string, { chain: string; usdc: string; color: string }> = {
+  aave:     { chain: 'Base Sepolia', usdc: 'Aave USDC (via Treasury)', color: 'text-blue-400' },
+  compound: { chain: 'Sepolia',      usdc: 'Circle USDC',              color: 'text-green-400' },
+  uniswap:  { chain: 'Sepolia',      usdc: 'Circle USDC',              color: 'text-pink-400' },
+  curve:    { chain: 'Sepolia',      usdc: 'Circle USDC (Morpho)',     color: 'text-yellow-400' },
+  yearn:    { chain: 'Simulated',    usdc: 'N/A',                      color: 'text-gray-400' },
+};
 
 interface GameUIProps {
   entities: GameEntity[];
   player?: PlayerProfile;
   guild?: GuildProfile;
   session?: SessionState;
-  accruedYield?: number;
+  empireTokens?: number;
   isConnecting?: boolean;
   isSettling?: boolean;
   connectionError?: string | null;
@@ -51,7 +59,7 @@ export function GameUI({
   player,
   guild,
   session,
-  accruedYield = 0,
+  empireTokens = 0,
   isConnecting = false,
   isSettling = false,
   onUpgrade,
@@ -69,7 +77,7 @@ export function GameUI({
 
   // Calculate total stats
   const totalTVL = entities.reduce((sum, e) => sum + e.deposited, 0);
-  const totalYield = entities.reduce(
+  const dailyEmpire = entities.reduce(
     (sum, e) => sum + (e.deposited * e.yieldRate * (1 + e.level * 0.1)) / 100 / 365,
     0,
   );
@@ -143,7 +151,7 @@ export function GameUI({
                   {isConnecting && (
                     <span className="flex items-center gap-1 text-purple-300 ml-2">
                       <Loader2 size={12} className="animate-spin" />
-                      connecting\u2026
+                      connecting{'\u2026'}
                     </span>
                   )}
                 </div>
@@ -194,14 +202,16 @@ export function GameUI({
           {session?.isSessionActive && (
             <button
               onClick={onSettle}
-              disabled={isSettling}
+              disabled={isSettling || totalTVL === 0}
               className="bg-yellow-500 hover:bg-yellow-400 disabled:bg-yellow-700 disabled:cursor-not-allowed text-black font-bold py-2 px-6 rounded-lg border-b-4 border-yellow-700 active:border-b-0 active:translate-y-1 transition-all shadow-lg uppercase tracking-wider flex items-center gap-2"
             >
               {isSettling ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Settling\u2026
+                  Settling{'\u2026'}
                 </>
+              ) : totalTVL === 0 ? (
+                '[ No Deposits ]'
               ) : (
                 '[ Settle ]'
               )}
@@ -226,81 +236,9 @@ export function GameUI({
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex justify-between items-start w-full mt-4">
-        {/* Left Sidebar - Building Cards */}
-        <div className="flex flex-col justify-center h-full pb-20 pointer-events-auto">
-          <aside className="flex flex-col gap-3 w-64">
-            {entities.map((entity) => (
-              <div
-                key={entity.id}
-                className="bg-game-panel border-2 border-game-border rounded-xl p-3 text-white relative hover:bg-purple-900/50 transition-colors group"
-              >
-                <div className="flex justify-between items-start mb-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded border border-white/30 bg-purple-900/30 flex items-center justify-center overflow-hidden">
-                      <img
-                        src={getEntityIconSrc(entity)}
-                        alt={`${entity.name} icon`}
-                        width={24}
-                        height={24}
-                        className="w-5 h-5 object-contain"
-                        style={{ imageRendering: 'pixelated' }}
-                      />
-                    </div>
-                    <div>
-                      <div className="font-bold uppercase leading-none">{entity.name}</div>
-                      <div className="text-xs text-purple-300">Lv{entity.level}</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-sm text-gray-300 mb-2 pl-8">
-                  {(entity.yieldRate * (1 + entity.level * 0.1)).toFixed(1)}% APY &middot; ${entity.deposited.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                </div>
-
-                {/* Deposit to building input */}
-                {session?.isSessionActive && (
-                  <div className="flex gap-1 mb-1">
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      placeholder="USDC"
-                      value={depositAmounts[entity.id] || ''}
-                      onChange={(e) =>
-                        setDepositAmounts((prev) => ({ ...prev, [entity.id]: e.target.value }))
-                      }
-                      aria-label={`Deposit USDC to ${entity.name}`}
-                      className="flex-1 bg-purple-900/50 border border-purple-600 rounded px-2 py-1 text-xs text-white placeholder-purple-400 outline-none focus:border-yellow-500 w-0"
-                    />
-                    <button
-                      onClick={() => handleBuildingDeposit(entity.id)}
-                      className="bg-green-600 hover:bg-green-500 text-xs font-bold py-1 px-2 rounded border-b-2 border-green-800 text-white uppercase shrink-0"
-                    >
-                      +
-                    </button>
-                  </div>
-                )}
-
-                <button
-                  onClick={() => onUpgrade?.(entity.id)}
-                  disabled={!session?.isSessionActive}
-                  className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-yellow-900 disabled:text-gray-500 disabled:cursor-not-allowed text-xs font-bold py-1 px-2 rounded border-b-2 border-yellow-800 disabled:border-yellow-900 text-black uppercase"
-                >
-                  {session?.isSessionActive ? '[ Upgrade ]' : '[ Connecting… ]'}
-                </button>
-              </div>
-            ))}
-
-            {/* Add Building Button */}
-            <button className="flex items-center justify-center gap-2 bg-purple-700 hover:bg-purple-600 border-2 border-purple-400 border-dashed rounded-xl p-3 text-purple-200 font-bold uppercase tracking-wider transition-all">
-              <Plus size={18} />
-              Add
-            </button>
-          </aside>
-        </div>
-
-        {/* Right Bottom Info Panel */}
-        <div className="pointer-events-auto max-h-[calc(100vh-200px)] overflow-y-auto">
+      <div className="flex-1 flex flex-col w-full mt-4">
+        {/* Right Top Info Panel */}
+        <div className="self-end pointer-events-auto">
           <div className="bg-game-panel border-2 border-game-border rounded-xl p-4 text-white w-72 shadow-2xl">
             <div className="space-y-1 mb-4 text-sm font-mono">
               <div className="flex justify-between text-gray-300">
@@ -308,13 +246,13 @@ export function GameUI({
                 <span className="text-white font-bold">${totalTVL.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-gray-300">
-                <span>Yield:</span>
-                <span className="text-green-400 font-bold">${totalYield.toFixed(4)}/day</span>
+                <span>$EMPIRE/day:</span>
+                <span className="text-green-400 font-bold">{dailyEmpire.toFixed(4)}</span>
               </div>
-              {accruedYield > 0 && (
+              {empireTokens > 0 && (
                 <div className="flex justify-between text-gray-300">
-                  <span>Accrued:</span>
-                  <span className="text-yellow-300 font-bold">${accruedYield.toFixed(4)}</span>
+                  <span>$EMPIRE:</span>
+                  <span className="text-yellow-300 font-bold">{empireTokens.toFixed(4)}</span>
                 </div>
               )}
               {guild && (
@@ -339,7 +277,7 @@ export function GameUI({
             {/* Compound All */}
             <button
               onClick={onCompoundAll}
-              disabled={accruedYield <= 0 || !session?.isSessionActive}
+              disabled={empireTokens <= 0 || !session?.isSessionActive}
               className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 disabled:from-yellow-800 disabled:to-yellow-900 disabled:text-gray-500 disabled:cursor-not-allowed text-black font-bold py-3 px-4 rounded-lg border-b-4 border-yellow-800 active:border-b-0 active:translate-y-1 transition-all shadow-lg flex items-center justify-between uppercase"
             >
               <span>[ Compound All ]</span>
@@ -347,14 +285,14 @@ export function GameUI({
             </button>
 
             {/* Guild Contribute */}
-            {session?.isSessionActive && accruedYield > 0.001 && (
+            {session?.isSessionActive && empireTokens > 0.001 && (
               <div className="flex gap-1 mt-2">
                 <input
                   type="number"
                   min="0"
                   step="0.01"
-                  max={accruedYield}
-                  placeholder="Yield to guild"
+                  max={empireTokens}
+                  placeholder="$EMPIRE to guild"
                   value={guildAmount}
                   onChange={(e) => setGuildAmount(e.target.value)}
                   aria-label="Amount to contribute to guild"
@@ -381,6 +319,97 @@ export function GameUI({
             )}
           </div>
         </div>
+
+        {/* Spacer to push building bar to bottom */}
+        <div className="flex-1" />
+
+        {/* Bottom Building Cards Bar */}
+        <div className="w-full pointer-events-auto pb-2">
+          <div className="grid grid-cols-4 gap-3 px-3">
+            {entities.map((entity) => (
+              <div
+                key={entity.id}
+                className="bg-game-panel border-2 border-game-border rounded-xl p-3 text-white relative hover:bg-purple-900/50 transition-colors group"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-6 h-6 rounded border border-white/30 bg-purple-900/30 flex items-center justify-center overflow-hidden">
+                    <img
+                      src={getEntityIconSrc(entity)}
+                      alt={`${entity.name} icon`}
+                      width={24}
+                      height={24}
+                      className="w-5 h-5 object-contain"
+                      style={{ imageRendering: 'pixelated' }}
+                    />
+                  </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-bold uppercase text-sm leading-none">{entity.name}</span>
+                    <span className="text-xs text-purple-300">Lv{entity.level}</span>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-300 mb-0.5">
+                  {entity.yieldRate.toFixed(1)}% APY
+                  {entity.rateSource === 'live' && <span className="text-[10px] text-green-400 ml-1">[LIVE]</span>}
+                  {entity.rateSource === 'estimated' && <span className="text-[10px] text-yellow-400 ml-1">[EST]</span>}
+                  {entity.rateSource === 'simulated' && <span className="text-[10px] text-gray-400 ml-1">[SIM]</span>}
+                  {' '}&middot; ${entity.deposited.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </div>
+                {/* Settlement chain & USDC type badge */}
+                {PROTOCOL_CHAIN_INFO[entity.protocol] && (
+                  <div className="text-[10px] text-purple-400 mb-2 flex items-center gap-1">
+                    <span className={`font-bold ${PROTOCOL_CHAIN_INFO[entity.protocol].color}`}>
+                      {PROTOCOL_CHAIN_INFO[entity.protocol].chain}
+                    </span>
+                    <span>&middot;</span>
+                    <span>{PROTOCOL_CHAIN_INFO[entity.protocol].usdc}</span>
+                  </div>
+                )}
+
+                {/* Deposit to building input */}
+                {session?.isSessionActive && (
+                  <div className="flex gap-1 mb-1">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="USDC to deposit"
+                      value={depositAmounts[entity.id] || ''}
+                      onChange={(e) =>
+                        setDepositAmounts((prev) => ({ ...prev, [entity.id]: e.target.value }))
+                      }
+                      aria-label={`Deposit USDC to ${entity.name}`}
+                      className="flex-1 bg-purple-900/50 border border-purple-600 rounded px-2 py-1.5 text-xs text-white placeholder-purple-400 outline-none focus:border-yellow-500 w-0"
+                    />
+                    <button
+                      onClick={() => handleBuildingDeposit(entity.id)}
+                      className="bg-green-600 hover:bg-green-500 text-xs font-bold py-1.5 px-2 rounded border-b-2 border-green-800 text-white uppercase shrink-0"
+                      title="Deposit USDC into this protocol"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => onUpgrade?.(entity.id)}
+                  disabled={!session?.isSessionActive || empireTokens < getUpgradeCost(entity.level)}
+                  className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-yellow-900 disabled:text-gray-500 disabled:cursor-not-allowed text-xs font-bold py-1.5 px-2 rounded border-b-2 border-yellow-800 disabled:border-yellow-900 text-black uppercase"
+                  title={
+                    !session?.isSessionActive
+                      ? 'Waiting for Yellow session\u2026'
+                      : empireTokens < getUpgradeCost(entity.level)
+                        ? `Need ${getUpgradeCost(entity.level).toFixed(2)} $EMPIRE \u2014 you have ${empireTokens.toFixed(2)}`
+                        : `Spend ${getUpgradeCost(entity.level).toFixed(2)} $EMPIRE to upgrade`
+                  }
+                >
+                  {!session?.isSessionActive
+                    ? '[ Connecting\u2026 ]'
+                    : `[ Upgrade \u00b7 ${getUpgradeCost(entity.level).toFixed(2)} $EMPIRE ]`}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Settling Overlay */}
@@ -390,7 +419,7 @@ export function GameUI({
             <Loader2 size={48} className="animate-spin mx-auto mb-4 text-yellow-400" />
             <h2 className="text-xl font-bold mb-2">Settling On-Chain</h2>
             <p className="text-gray-400 text-sm">
-              Executing protocol transactions across chains. This may take a moment\u2026
+              Executing protocol transactions across chains. This may take a moment...
             </p>
           </div>
         </div>

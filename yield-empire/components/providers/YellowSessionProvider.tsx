@@ -22,7 +22,7 @@ import {
   useRef,
   type ReactNode,
 } from 'react';
-import { useAccount, useWalletClient } from 'wagmi';
+import { useAccount, usePublicClient, useSwitchChain, useWalletClient } from 'wagmi';
 import { YellowSessionManager } from '@/lib/yellow/session-manager';
 import type { GameAction, GameEntity, SessionState, SettlementResult, SettlementTx } from '@/lib/types';
 import type { RPCAppSessionAllocation } from '@erc7824/nitrolite';
@@ -32,6 +32,7 @@ import { swapOnUniswap } from '@/lib/protocols/uniswap';
 import { supplyToMorpho } from '@/lib/protocols/morpho';
 import { BUILDING_CONFIGS } from '@/lib/constants';
 import { PROTOCOL_CHAIN_MAP, SETTLEMENT_CHAINS } from '@/lib/protocols/addresses';
+import { updatePlayerProfile } from '@/lib/ens/guild-manager';
 
 export interface YellowSessionContextValue {
   // Connection state
@@ -53,7 +54,7 @@ export interface YellowSessionContextValue {
   // Actions
   connect: () => Promise<void>;
   createSession: () => Promise<void>;
-  settleSession: (entities: GameEntity[]) => Promise<void>;
+  settleSession: (entities: GameEntity[], meta?: { empireLevel: number; totalEmpireEarned: number; ensName?: string }) => Promise<boolean>;
   performAction: (action: GameAction, gameState: object) => Promise<void>;
   disconnect: () => void;
 }
@@ -69,11 +70,11 @@ const defaultValue: YellowSessionContextValue = {
   sessionId: null,
   actionBreakdown: {},
   lastSettlement: null,
-  connect: async () => {},
-  createSession: async () => {},
-  settleSession: async () => {},
-  performAction: async () => {},
-  disconnect: () => {},
+  connect: async () => { },
+  createSession: async () => { },
+  settleSession: async () => false,
+  performAction: async () => { },
+  disconnect: () => { },
 };
 
 export const YellowSessionContext =
@@ -94,6 +95,8 @@ function chainName(chainId: number): string {
 export function YellowSessionProvider({ children }: { children: ReactNode }) {
   const { address, isConnected: isWalletConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
+  const { switchChainAsync } = useSwitchChain();
 
   const [sessionState, setSessionState] = useState<SessionState>({
     isConnected: false,
@@ -199,11 +202,14 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
   /**
    * Settle session: close Yellow Network state channel, then execute
    * real on-chain protocol transactions for each building allocation.
+   *
+   * Transactions are grouped by chain to minimize chain switches.
+   * Approve receipts are awaited before supply to prevent race conditions.
    */
-  const settleSession = useCallback(async (entities: GameEntity[]) => {
-    if (!managerRef.current || !address || !walletClient) {
+  const settleSession = useCallback(async (entities: GameEntity[], meta?: { empireLevel: number; totalEmpireEarned: number; ensName?: string }): Promise<boolean> => {
+    if (!managerRef.current || !address || !walletClient || !publicClient) {
       setError('Cannot settle session');
-      return;
+      return false;
     }
 
     setIsSettling(true);
@@ -219,58 +225,120 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
       const finalAllocations: RPCAppSessionAllocation[] = [];
       await managerRef.current.settleSession(address, finalAllocations);
 
-      // Step 2: Execute real protocol transactions for each building
+      // Step 2: Group settleable entities by chain to minimize switching
+      const settleable = entities.filter((e) => {
+        if (e.deposited <= 0) return false;
+        const chainId = PROTOCOL_CHAIN_MAP[e.protocol as keyof typeof PROTOCOL_CHAIN_MAP];
+        return !!chainId;
+      });
+
+      const chainGroups = new Map<number, GameEntity[]>();
+      for (const entity of settleable) {
+        const chainId = PROTOCOL_CHAIN_MAP[entity.protocol as keyof typeof PROTOCOL_CHAIN_MAP];
+        const group = chainGroups.get(chainId) ?? [];
+        group.push(entity);
+        chainGroups.set(chainId, group);
+      }
+
+      // Process Sepolia first (most protocols), then Base Sepolia
+      const sortedChains = [...chainGroups.keys()].sort((a, b) => {
+        if (a === SETTLEMENT_CHAINS.SEPOLIA) return -1;
+        if (b === SETTLEMENT_CHAINS.SEPOLIA) return 1;
+        return a - b;
+      });
+
       const transactions: SettlementTx[] = [];
 
-      for (const entity of entities) {
-        if (entity.deposited <= 0) continue;
+      for (const chainId of sortedChains) {
+        const chainEntities = chainGroups.get(chainId)!;
 
-        const protocol = entity.protocol;
-        const protocolConfig = BUILDING_CONFIGS[protocol];
-        const chainId = PROTOCOL_CHAIN_MAP[protocol as keyof typeof PROTOCOL_CHAIN_MAP];
-
-        // Skip protocols without settlement support (yearn = Observatory, simulated)
-        if (!chainId) continue;
-
-        const amount = usdToUsdc6(entity.deposited);
-        const tx: SettlementTx = {
-          protocol,
-          protocolName: protocolConfig.name,
-          chain: chainName(chainId),
-          chainId,
-          amount,
-          hash: '',
-          status: 'pending',
-        };
-
+        // Switch wallet to the target chain
         try {
-          let hash: string;
-
-          switch (protocol) {
-            case 'compound':
-              hash = await supplyToCompound(walletClient, amount);
-              break;
-            case 'aave':
-              hash = await supplyToAave(walletClient, amount);
-              break;
-            case 'uniswap':
-              hash = await swapOnUniswap(walletClient, amount);
-              break;
-            case 'curve':
-              // "Liquid Pool" building maps to Morpho Blue (direct Circle USDC)
-              hash = await supplyToMorpho(walletClient, amount);
-              break;
-            default:
-              continue;
+          await switchChainAsync({ chainId });
+        } catch (switchErr) {
+          // User rejected chain switch — mark all txs for this chain as failed
+          for (const entity of chainEntities) {
+            const protocolConfig = BUILDING_CONFIGS[entity.protocol];
+            transactions.push({
+              protocol: entity.protocol,
+              protocolName: protocolConfig.name,
+              chain: chainName(chainId),
+              chainId,
+              amount: usdToUsdc6(entity.deposited),
+              hash: '',
+              status: 'failed',
+              error: `Chain switch to ${chainName(chainId)} rejected`,
+            });
           }
+          continue;
+        }
 
-          transactions.push({ ...tx, hash, status: 'confirmed' });
-        } catch (txErr) {
-          transactions.push({
-            ...tx,
-            status: 'failed',
-            error: txErr instanceof Error ? txErr.message : 'Transaction failed',
+        // Execute all protocol transactions on this chain
+        for (const entity of chainEntities) {
+          const protocol = entity.protocol;
+          const protocolConfig = BUILDING_CONFIGS[protocol];
+          const amount = usdToUsdc6(entity.deposited);
+          const tx: SettlementTx = {
+            protocol,
+            protocolName: protocolConfig.name,
+            chain: chainName(chainId),
+            chainId,
+            amount,
+            hash: '',
+            status: 'pending',
+          };
+
+          try {
+            let hash: string;
+
+            switch (protocol) {
+              case 'compound':
+                hash = await supplyToCompound(walletClient, publicClient, amount);
+                break;
+              case 'aave':
+                hash = await supplyToAave(walletClient, publicClient, amount);
+                break;
+              case 'uniswap':
+                hash = await swapOnUniswap(walletClient, publicClient, amount);
+                break;
+              case 'curve':
+                // "Liquid Pool" building maps to Morpho Blue (direct Circle USDC)
+                hash = await supplyToMorpho(walletClient, publicClient, amount);
+                break;
+              default:
+                continue;
+            }
+
+            transactions.push({ ...tx, hash, status: 'confirmed' });
+          } catch (txErr) {
+            transactions.push({
+              ...tx,
+              status: 'failed',
+              error: txErr instanceof Error ? txErr.message : 'Transaction failed',
+            });
+          }
+        }
+      }
+
+      // Step 3: Update ENS text records (optional, non-blocking)
+      // ENS is on Sepolia — switch back if needed
+      if (meta?.ensName && walletClient) {
+        try {
+          await switchChainAsync({ chainId: SETTLEMENT_CHAINS.SEPOLIA });
+          const totalDeposited = entities.reduce((s, e) => s + e.deposited, 0);
+          // Find the protocol with the highest deposit
+          const sorted = [...entities].sort((a, b) => b.deposited - a.deposited);
+          const favoriteProtocol = sorted[0]?.deposited > 0 ? sorted[0].protocol : undefined;
+
+          await updatePlayerProfile(walletClient, meta.ensName, {
+            empireLevel: meta.empireLevel,
+            totalContribution: totalDeposited,
+            favoriteProtocol,
+            prestigeCount: 0,
           });
+        } catch (ensErr) {
+          // ENS write failures should NOT fail the settlement
+          console.warn('Failed to update ENS profile:', ensErr);
         }
       }
 
@@ -282,15 +350,19 @@ export function YellowSessionProvider({ children }: { children: ReactNode }) {
         transactions,
         timestamp: Date.now(),
       });
+
+      // Return true only if all transactions succeeded
+      const allSucceeded = transactions.every(tx => tx.status === 'confirmed');
+      return allSucceeded;
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to settle session',
       );
-      throw err;
+      return false;
     } finally {
       setIsSettling(false);
     }
-  }, [address, walletClient]);
+  }, [address, walletClient, publicClient, switchChainAsync]);
 
   const disconnect = useCallback(() => {
     if (managerRef.current) {

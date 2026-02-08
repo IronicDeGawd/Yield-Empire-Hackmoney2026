@@ -6,7 +6,7 @@
  * Includes animated effects (smoke, glow) and hover highlights
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Container as PixiContainerClass, Graphics } from 'pixi.js';
 import { useTick } from '@pixi/react';
 import { PixiApplication } from './pixi/PixiApplication';
@@ -48,10 +48,11 @@ function IsometricScene({
   connections,
   width,
   height,
+  isUnmounted,
   onEntityClick,
   onEntityHover,
   textures,
-}: PixiIsometricMapProps & { textures: GameSpriteTextures }) {
+}: PixiIsometricMapProps & { textures: GameSpriteTextures; isUnmounted: React.MutableRefObject<boolean> }) {
   const timeRef = useRef(0);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
@@ -140,6 +141,9 @@ function IsometricScene({
   );
 
   useTick((ticker) => {
+    // Guard against operations after unmount (prevents crashes on page refresh)
+    if (isUnmounted.current) return;
+
     timeRef.current += ticker.deltaTime / 60;
     const dt = ticker.deltaTime / 60;
 
@@ -295,13 +299,30 @@ function IsometricScene({
 
 export function PixiIsometricMap(props: PixiIsometricMapProps) {
   const [textures, setTextures] = useState<GameSpriteTextures | null>(null);
+  const isUnmountedRef = useRef(false);
+
+  // Track unmount state to prevent operations after component is destroyed
+  useEffect(() => {
+    isUnmountedRef.current = false;
+    return () => {
+      isUnmountedRef.current = true;
+      // Clear textures to prevent stale WebGL references
+      setTextures(null);
+    };
+  }, []);
 
   // Load textures after the PixiJS Application (and its WebGL context) has initialized.
   // Loading before this point creates textures without a GPU context, rendering them blank.
   const handleAppInit = useCallback(() => {
+    // Don't load if already unmounted (can happen during fast refresh)
+    if (isUnmountedRef.current) return;
+
     loadGameSpriteTextures()
       .then((loaded) => {
-        setTextures(loaded);
+        // Guard against setting state after unmount
+        if (!isUnmountedRef.current) {
+          setTextures(loaded);
+        }
       })
       .catch((err) => {
         console.error('Failed to load game sprites:', err);
@@ -314,7 +335,7 @@ export function PixiIsometricMap(props: PixiIsometricMapProps) {
       height={props.height}
       onInit={handleAppInit}
     >
-      {textures && <IsometricScene {...props} textures={textures} />}
+      {textures && <IsometricScene {...props} textures={textures} isUnmounted={isUnmountedRef} />}
     </PixiApplication>
   );
 }

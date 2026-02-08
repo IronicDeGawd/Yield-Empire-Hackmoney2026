@@ -17,6 +17,7 @@ import {
   getPlayerProfile,
   resolveAddress,
   fetchGuildMembers,
+  proxyAvatarUrl,
   type SubgraphDomain,
 } from '@/lib/ens/guild-manager';
 import type { GuildProfile, PlayerProfile } from '@/lib/types';
@@ -51,7 +52,7 @@ export function usePlayerIdentity(): PlayerIdentity {
   return {
     address,
     ensName,
-    avatar,
+    avatar: proxyAvatarUrl(avatar),
     displayName,
     isLoading: isLoadingName || isLoadingAvatar,
   };

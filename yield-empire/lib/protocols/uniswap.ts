@@ -9,7 +9,7 @@
  * SwapRouter — representing 'active trading' rather than passive LP."
  */
 
-import { type Address, type Hash, type WalletClient } from 'viem';
+import { type Address, type Hash, type PublicClient, type WalletClient } from 'viem';
 import { sepolia } from 'wagmi/chains';
 import { PROTOCOL_ADDRESSES } from './addresses';
 import { UNISWAP_ROUTER_ABI, ERC20_ABI } from './abis';
@@ -27,20 +27,25 @@ const { UNISWAP, CIRCLE_USDC, WETH } = PROTOCOL_ADDRESSES;
  */
 export async function swapOnUniswap(
   walletClient: WalletClient,
+  publicClient: PublicClient,
   amount: bigint,
 ): Promise<Hash> {
   const account = walletClient.account;
   if (!account) throw new Error('Wallet not connected');
 
   // Step 1: Approve SwapRouter to spend Circle USDC
-  await walletClient.writeContract({
+  const approveHash = await walletClient.writeContract({
     address: CIRCLE_USDC.SEPOLIA,
     abi: ERC20_ABI,
     functionName: 'approve',
     args: [UNISWAP.ROUTER, amount],
     chain: sepolia,
     account,
+    gas: BigInt(100_000), // Explicit limit to prevent inflated estimation
   });
+
+  // Wait for approve to be mined before swap
+  await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
   // Step 2: Execute swap — USDC → WETH, 0.3% fee tier, no price limit
   const hash = await walletClient.writeContract({
@@ -60,6 +65,7 @@ export async function swapOnUniswap(
     ],
     chain: sepolia,
     account,
+    gas: BigInt(350_000), // Explicit limit to prevent inflated estimation
   });
 
   return hash;

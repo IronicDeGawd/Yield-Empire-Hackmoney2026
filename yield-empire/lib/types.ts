@@ -14,6 +14,9 @@ export type BuildingType = 'factory' | 'crystal' | 'bank' | 'empty';
 // DeFi protocol identifiers
 export type ProtocolId = 'aave' | 'compound' | 'uniswap' | 'curve' | 'yearn';
 
+// Rate source indicator for APY values
+export type RateSource = 'live' | 'estimated' | 'simulated';
+
 // Game entity representing a building/island on the map
 export interface GameEntity {
   id: string;
@@ -21,10 +24,11 @@ export interface GameEntity {
   name: string;
   protocol: ProtocolId;
   level: number;
-  yieldRate: number; // Base APY percentage
+  yieldRate: number; // Base APY percentage (overridden by live rates when available)
   deposited: number; // Amount deposited in USD
   position: Coordinate;
   color: string;
+  rateSource?: RateSource;
 }
 
 // Connection between islands (bridges)
@@ -40,7 +44,7 @@ export interface PlayerProfile {
   avatar?: string;
   empireLevel: number;
   totalDeposited: number;
-  totalYield: number;
+  totalEmpireEarned: number;
   prestigeCount: number;
   guildName?: string;
 }

@@ -34,6 +34,7 @@ function createMockWalletClient(address = MOCK_ADDRESS) {
 function createMockPublicClient(balance = BigInt(1_000_000)) {
   return {
     readContract: jest.fn().mockResolvedValue(balance),
+    waitForTransactionReceipt: jest.fn().mockResolvedValue({ status: 'success' }),
   };
 }
 
@@ -68,9 +69,10 @@ describe('Phase A.1 — Aave V3', () => {
     await loadAaveModule();
 
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(1_000_000);
 
-    await supplyToAave(wallet as any, amount);
+    await supplyToAave(wallet as any, pub as any, amount);
 
     expect(wallet.writeContract).toHaveBeenCalledTimes(1);
     expect(wallet.writeContract).toHaveBeenCalledWith(
@@ -89,9 +91,10 @@ describe('Phase A.1 — Aave V3', () => {
     await loadAaveModule();
 
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(1_000_000);
 
-    await supplyToAave(wallet as any, amount);
+    await supplyToAave(wallet as any, pub as any, amount);
 
     // Direct path: approve + supply = 2 calls
     expect(wallet.writeContract).toHaveBeenCalledTimes(2);
@@ -117,9 +120,10 @@ describe('Phase A.1 — Aave V3', () => {
     await loadAaveModule();
 
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(5_000_000);
 
-    const hash = await supplyToAaveDirect(wallet as any, amount);
+    const hash = await supplyToAaveDirect(wallet as any, pub as any, amount);
 
     expect(hash).toBe(MOCK_TX_HASH);
     expect(wallet.writeContract).toHaveBeenCalledTimes(2);
@@ -150,10 +154,11 @@ describe('Phase A.1 — Aave V3', () => {
     await loadAaveModule();
 
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(2_000_000);
     const customRecipient = '0xCustomRecipient00000000000000000000000001' as `0x${string}`;
 
-    await supplyToAaveDirect(wallet as any, amount, customRecipient);
+    await supplyToAaveDirect(wallet as any, pub as any, amount, customRecipient);
 
     // Supply call should use the custom recipient
     expect(wallet.writeContract).toHaveBeenNthCalledWith(2,
@@ -240,9 +245,10 @@ describe('Phase A.2 — Compound V3', () => {
 
   test('supplyToCompound() calls approve then supply', async () => {
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(1_000_000);
 
-    const hash = await supplyToCompound(wallet as any, amount);
+    const hash = await supplyToCompound(wallet as any, pub as any, amount);
 
     expect(hash).toBe(MOCK_TX_HASH);
     expect(wallet.writeContract).toHaveBeenCalledTimes(2);
@@ -270,9 +276,10 @@ describe('Phase A.2 — Compound V3', () => {
 
   test('supplyToCompound() uses Circle USDC on Sepolia', async () => {
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(500_000);
 
-    await supplyToCompound(wallet as any, amount);
+    await supplyToCompound(wallet as any, pub as any, amount);
 
     // Verify the token approved is Circle USDC on Sepolia
     expect(wallet.writeContract).toHaveBeenNthCalledWith(1,
@@ -330,9 +337,10 @@ describe('Phase A.3 — Morpho Blue', () => {
 
   test('supplyToMorpho() calls approve then supply with market params', async () => {
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(3_000_000);
 
-    const hash = await supplyToMorpho(wallet as any, amount);
+    const hash = await supplyToMorpho(wallet as any, pub as any, amount);
 
     expect(hash).toBe(MOCK_TX_HASH);
     expect(wallet.writeContract).toHaveBeenCalledTimes(2);
@@ -372,10 +380,11 @@ describe('Phase A.3 — Morpho Blue', () => {
 
   test('supplyToMorpho() uses onBehalf when provided', async () => {
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(1_000_000);
     const customRecipient = '0xCustomRecipient00000000000000000000000001' as `0x${string}`;
 
-    await supplyToMorpho(wallet as any, amount, customRecipient);
+    await supplyToMorpho(wallet as any, pub as any, amount, customRecipient);
 
     // Supply should use custom recipient for onBehalf
     expect(wallet.writeContract).toHaveBeenNthCalledWith(2,
@@ -394,9 +403,10 @@ describe('Phase A.3 — Morpho Blue', () => {
 
   test('supplyToMorpho() passes empty callback data (0x)', async () => {
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(1_000_000);
 
-    await supplyToMorpho(wallet as any, amount);
+    await supplyToMorpho(wallet as any, pub as any, amount);
 
     const supplyCall = wallet.writeContract.mock.calls[1][0];
     // Last arg in the supply args array should be '0x'
@@ -445,9 +455,10 @@ describe('Phase A.4 — Uniswap V3', () => {
 
   test('swapOnUniswap() calls approve then exactInputSingle', async () => {
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(10_000_000);
 
-    const hash = await swapOnUniswap(wallet as any, amount);
+    const hash = await swapOnUniswap(wallet as any, pub as any, amount);
 
     expect(hash).toBe(MOCK_TX_HASH);
     expect(wallet.writeContract).toHaveBeenCalledTimes(2);
@@ -474,9 +485,10 @@ describe('Phase A.4 — Uniswap V3', () => {
 
   test('swapOnUniswap() uses 0.3% fee tier (3000)', async () => {
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(5_000_000);
 
-    await swapOnUniswap(wallet as any, amount);
+    await swapOnUniswap(wallet as any, pub as any, amount);
 
     const swapCall = wallet.writeContract.mock.calls[1][0];
     expect(swapCall.args[0].fee).toBe(3000);
@@ -484,9 +496,10 @@ describe('Phase A.4 — Uniswap V3', () => {
 
   test('swapOnUniswap() sets amountOutMinimum and sqrtPriceLimitX96 to 0', async () => {
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     const amount = BigInt(5_000_000);
 
-    await swapOnUniswap(wallet as any, amount);
+    await swapOnUniswap(wallet as any, pub as any, amount);
 
     const swapCall = wallet.writeContract.mock.calls[1][0];
     const params = swapCall.args[0];
@@ -504,6 +517,7 @@ describe('Phase A.4 — Uniswap V3', () => {
 describe('Phase A.5 — Error Handling', () => {
   test('all supply functions throw when walletClient.account is null', async () => {
     const walletNoAccount = { account: null, writeContract: jest.fn() };
+    const pub = createMockPublicClient();
     const amount = BigInt(1_000_000);
 
     const { supplyToAaveDirect } = await import('@/lib/protocols/aave');
@@ -511,10 +525,10 @@ describe('Phase A.5 — Error Handling', () => {
     const { supplyToMorpho } = await import('@/lib/protocols/morpho');
     const { swapOnUniswap } = await import('@/lib/protocols/uniswap');
 
-    await expect(supplyToAaveDirect(walletNoAccount as any, amount)).rejects.toThrow('Wallet not connected');
-    await expect(supplyToCompound(walletNoAccount as any, amount)).rejects.toThrow('Wallet not connected');
-    await expect(supplyToMorpho(walletNoAccount as any, amount)).rejects.toThrow('Wallet not connected');
-    await expect(swapOnUniswap(walletNoAccount as any, amount)).rejects.toThrow('Wallet not connected');
+    await expect(supplyToAaveDirect(walletNoAccount as any, pub as any, amount)).rejects.toThrow('Wallet not connected');
+    await expect(supplyToCompound(walletNoAccount as any, pub as any, amount)).rejects.toThrow('Wallet not connected');
+    await expect(supplyToMorpho(walletNoAccount as any, pub as any, amount)).rejects.toThrow('Wallet not connected');
+    await expect(swapOnUniswap(walletNoAccount as any, pub as any, amount)).rejects.toThrow('Wallet not connected');
   });
 
   test('settleAaveViaTreasury() throws when treasury not deployed', async () => {
@@ -533,6 +547,7 @@ describe('Phase A.5 — Error Handling', () => {
   test('supplyToCompound() propagates writeContract rejection', async () => {
     const { supplyToCompound } = await import('@/lib/protocols/compound');
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     // First call (approve) succeeds, second call (supply) fails
     wallet.writeContract
       .mockResolvedValueOnce(MOCK_TX_HASH)
@@ -540,7 +555,7 @@ describe('Phase A.5 — Error Handling', () => {
 
     const amount = BigInt(1_000_000);
 
-    await expect(supplyToCompound(wallet as any, amount)).rejects.toThrow('Supply reverted');
+    await expect(supplyToCompound(wallet as any, pub as any, amount)).rejects.toThrow('Supply reverted');
   });
 
   test('supplyToAaveDirect() propagates error if supply fails after approve', async () => {
@@ -549,11 +564,12 @@ describe('Phase A.5 — Error Handling', () => {
 
     const { supplyToAaveDirect } = await import('@/lib/protocols/aave');
     const wallet = createMockWalletClient();
+    const pub = createMockPublicClient();
     wallet.writeContract
       .mockResolvedValueOnce(MOCK_TX_HASH) // approve succeeds
       .mockRejectedValueOnce(new Error('Supply reverted')); // supply fails
 
-    await expect(supplyToAaveDirect(wallet as any, BigInt(1_000_000))).rejects.toThrow('Supply reverted');
+    await expect(supplyToAaveDirect(wallet as any, pub as any, BigInt(1_000_000))).rejects.toThrow('Supply reverted');
     // Approve was still called
     expect(wallet.writeContract).toHaveBeenCalledTimes(2);
   });

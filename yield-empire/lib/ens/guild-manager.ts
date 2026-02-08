@@ -116,7 +116,7 @@ export async function getPlayerProfile(
     avatar: avatar ?? undefined,
     empireLevel: Number(empireLevel) || 1,
     totalDeposited: Number(totalContribution) || 0,
-    totalYield: 0,
+    totalEmpireEarned: 0,
     prestigeCount: Number(prestigeCount) || 0,
   };
 }
@@ -140,6 +140,23 @@ export async function resolveAddress(
 }
 
 /**
+ * Rewrite euc.li avatar URLs to use the Next.js rewrite proxy,
+ * avoiding CORS errors when loading images client-side.
+ */
+export function proxyAvatarUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'euc.li') {
+      return `/api/ens-avatar${parsed.pathname}`;
+    }
+  } catch {
+    // Not a valid URL — return as-is
+  }
+  return url;
+}
+
+/**
  * Get ENS avatar URL for a name.
  */
 export async function getAvatar(
@@ -150,7 +167,7 @@ export async function getAvatar(
     const avatar = await publicClient.getEnsAvatar({
       name: normalize(name),
     });
-    return avatar;
+    return proxyAvatarUrl(avatar);
   } catch (error) {
     console.error(`Failed to get avatar for ${name}:`, error);
     return null;
@@ -178,6 +195,7 @@ export async function setTextRecord(
     abi: PUBLIC_RESOLVER_ABI,
     functionName: 'setText',
     args: [node, key, value],
+    gas: BigInt(150_000), // Explicit limit to prevent inflated estimation
   });
   return hash;
 }
@@ -199,6 +217,39 @@ export async function updateGuildStats(
     }
   }
   return hashes;
+}
+
+/**
+ * Update player profile text records on ENS after settlement.
+ * Each field is a separate on-chain transaction (setText).
+ * Skips fields with zero/empty values to minimize gas.
+ */
+export async function updatePlayerProfile(
+  walletClient: AnyWalletClient,
+  playerName: string,
+  stats: {
+    empireLevel: number;
+    totalContribution: number;
+    favoriteProtocol?: string;
+    prestigeCount: number;
+  },
+): Promise<Hash[]> {
+  const records: Partial<Record<string, string>> = {};
+
+  if (stats.empireLevel > 0) {
+    records[GAME_KEYS.EMPIRE_LEVEL] = String(stats.empireLevel);
+  }
+  if (stats.totalContribution > 0) {
+    records[GAME_KEYS.TOTAL_CONTRIBUTION] = String(Math.round(stats.totalContribution));
+  }
+  if (stats.favoriteProtocol) {
+    records[GAME_KEYS.FAVORITE_PROTOCOL] = stats.favoriteProtocol;
+  }
+  if (stats.prestigeCount > 0) {
+    records[GAME_KEYS.PRESTIGE_COUNT] = String(stats.prestigeCount);
+  }
+
+  return updateGuildStats(walletClient, playerName, records);
 }
 
 // ============================================================================
@@ -227,6 +278,7 @@ export async function createGuildMember(
     abi: ENS_REGISTRY_ABI,
     functionName: 'setSubnodeRecord',
     args: [parentNode, labelHash, ownerAddress, contracts.PUBLIC_RESOLVER, BigInt(0)],
+    gas: BigInt(200_000), // Explicit limit to prevent inflated estimation
   });
   return hash;
 }

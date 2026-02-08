@@ -15,6 +15,29 @@ import { baseSepolia } from 'wagmi/chains';
 import { PROTOCOL_ADDRESSES } from './addresses';
 import { AAVE_POOL_ABI, AAVE_FAUCET_ABI, ERC20_ABI, TREASURY_ABI } from './abis';
 
+/**
+ * Fetch Aave V3 supply APY from on-chain reserve data.
+ * Uses getReserveData() which returns currentLiquidityRate in RAY (27 decimals).
+ */
+export async function getAaveSupplyAPY(
+  publicClient: PublicClient,
+): Promise<number> {
+  const reserveData = await publicClient.readContract({
+    address: AAVE.POOL,
+    abi: AAVE_POOL_ABI,
+    functionName: 'getReserveData',
+    args: [AAVE.USDC],
+  });
+
+  // currentLiquidityRate is at index 2 of the returned struct, in RAY (1e27)
+  const currentLiquidityRate = (reserveData as { currentLiquidityRate: bigint }).currentLiquidityRate;
+  const RAY = BigInt(10) ** BigInt(27);
+
+  // Convert RAY to percentage: (rate / 1e27) * 100
+  const apyBps = Number((currentLiquidityRate * BigInt(10000)) / RAY);
+  return apyBps / 100; // e.g. 3.45 for 3.45%
+}
+
 const { AAVE, TREASURY } = PROTOCOL_ADDRESSES;
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -54,6 +77,7 @@ export async function settleAaveViaTreasury(
     args: [player, amount],
     chain: baseSepolia,
     account,
+    gas: BigInt(500_000), // Explicit limit to prevent inflated estimation
   });
 
   return hash;
@@ -65,6 +89,7 @@ export async function settleAaveViaTreasury(
  */
 export async function supplyToAaveDirect(
   walletClient: WalletClient,
+  publicClient: PublicClient,
   amount: bigint,
   onBehalfOf?: Address,
 ): Promise<Hash> {
@@ -74,14 +99,18 @@ export async function supplyToAaveDirect(
   const recipient = onBehalfOf ?? account.address;
 
   // Step 1: Approve Aave Pool to spend Aave test USDC
-  await walletClient.writeContract({
+  const approveHash = await walletClient.writeContract({
     address: AAVE.USDC,
     abi: ERC20_ABI,
     functionName: 'approve',
     args: [AAVE.POOL, amount],
     chain: baseSepolia,
     account,
+    gas: BigInt(100_000), // Explicit limit to prevent inflated estimation
   });
+
+  // Wait for approve to be mined before supply
+  await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
   // Step 2: Supply to Aave Pool
   const hash = await walletClient.writeContract({
@@ -91,6 +120,7 @@ export async function supplyToAaveDirect(
     args: [AAVE.USDC, amount, recipient, 0],
     chain: baseSepolia,
     account,
+    gas: BigInt(400_000), // Explicit limit to prevent inflated estimation
   });
 
   return hash;
@@ -101,6 +131,7 @@ export async function supplyToAaveDirect(
  */
 export async function supplyToAave(
   walletClient: WalletClient,
+  publicClient: PublicClient,
   amount: bigint,
   onBehalfOf?: Address,
 ): Promise<Hash> {
@@ -111,7 +142,7 @@ export async function supplyToAave(
     return settleAaveViaTreasury(walletClient, onBehalfOf ?? account.address, amount);
   }
 
-  return supplyToAaveDirect(walletClient, amount, onBehalfOf);
+  return supplyToAaveDirect(walletClient, publicClient, amount, onBehalfOf);
 }
 
 /**
@@ -135,6 +166,7 @@ export async function withdrawFromAave(
     args: [AAVE.USDC, amount, recipient],
     chain: baseSepolia,
     account,
+    gas: BigInt(400_000), // Explicit limit to prevent inflated estimation
   });
 
   return hash;
@@ -178,6 +210,7 @@ export async function mintFromAaveFaucet(
     args: [AAVE.USDC, recipient, amount],
     chain: baseSepolia,
     account,
+    gas: BigInt(300_000), // Explicit limit to prevent inflated estimation
   });
 
   return hash;

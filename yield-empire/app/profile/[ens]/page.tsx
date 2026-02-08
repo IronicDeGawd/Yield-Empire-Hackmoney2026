@@ -178,8 +178,8 @@ export default function ProfilePage({ params }: { params: Promise<{ ens: string 
                 icon={<TrendingUp size={20} className="text-green-400" />}
               />
               <StatCard
-                label="Total Yield"
-                value={`$${(profile?.totalYield ?? 0).toFixed(2)}`}
+                label="$EMPIRE Earned"
+                value={`${(profile?.totalEmpireEarned ?? 0).toFixed(2)}`}
                 icon={<Zap size={20} className="text-purple-400" />}
               />
               <StatCard
